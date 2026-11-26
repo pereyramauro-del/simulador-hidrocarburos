@@ -2,7 +2,9 @@ import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vitest/config'
 import { VitePWA } from 'vite-plugin-pwa'
 
+// En GitHub Pages el sitio vive en /simulador-hidrocarburos/; BASE_PATH lo define el workflow.
 export default defineConfig({
+  base: process.env.BASE_PATH ?? '/',
   plugins: [
     react(),
     VitePWA({
