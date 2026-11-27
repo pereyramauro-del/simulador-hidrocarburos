@@ -1,176 +1,32 @@
-import { useEffect, useLayoutEffect, useRef, useState, type PointerEvent as RPointerEvent } from 'react'
-
 interface Props {
   label: string
   text: string
   go?: string
   wait?: string
-  /** cambia con cada paso; reabre el globo si estaba plegado */
+  /** no hay nada que tocar: se está esperando */
+  waiting: boolean
+  /** cambia con cada paso; vuelve a animar el globo */
   stepKey: string
 }
 
 const A = 60 // tamaño del capitán
-const GAP = 10
-const BW = 290 // ancho máximo del globo
-
-type Pos = { x: number; y: number; above: boolean; left: boolean; target: boolean }
-
-/*
-  Dónde está lo que hay que tocar. El orden importa: primero el popup de
-  válvula, después la vista, el mímico, las pestañas y la barra superior.
-*/
-const SELECTORS = ['.valve-pop .guide', '.view .guide', '.view .mimic .guide-pulse', '.tabs .guide', '.topbar .guide']
-function findTarget(): { r: DOMRect; pop: DOMRect | null } | null {
-  for (const sel of SELECTORS) {
-    const el = document.querySelector(sel)
-    if (el) {
-      const r = el.getBoundingClientRect()
-      if (r.width > 0 || r.height > 0) return { r, pop: el.closest('.valve-pop')?.getBoundingClientRect() ?? null }
-    }
-  }
-  return null
-}
-
-/** Botón dentro del popup de válvula: el capitán se pone al costado del popup, a la altura del botón. */
-function besidePopup(r: DOMRect, pop: DOMRect): Pos {
-  const vw = window.innerWidth
-  const y = r.top + r.height / 2 - A / 2
-  const right = pop.right + GAP + A + GAP + Math.min(BW, 200) < vw
-  return place(right ? pop.right + GAP : pop.left - GAP - A, y, true)
-}
-
-function place(x: number, y: number, target: boolean, aboveHint = false): Pos {
-  const vw = window.innerWidth
-  const vh = window.innerHeight
-  const cx = Math.min(Math.max(8, x), vw - A - 8)
-  const cy = Math.min(Math.max(8, y), vh - A - 8)
-  const bw = Math.min(BW, vw - A - 3 * GAP)
-  return { x: cx, y: cy, above: aboveHint || cy > vh * 0.55, left: cx + A + GAP + bw > vw - 8, target }
-}
-
-/** Posición junto al objetivo: debajo de él (o arriba si no entra), sin taparlo. */
-function near(r: DOMRect): Pos {
-  const vh = window.innerHeight
-  const x = r.left + r.width / 2 - A / 2 + Math.min(r.width / 2, 24)
-  let y = r.bottom + GAP
-  let above = false
-  if (y + A > vh - 8) {
-    y = r.top - GAP - A
-    above = true
-  }
-  return place(x, y, true, above)
-}
-
-function rest(): Pos {
-  const main = document.querySelector('.main')?.getBoundingClientRect()
-  const vh = window.innerHeight
-  const bottom = Math.min(vh, main?.bottom ?? vh)
-  return place((main?.left ?? 0) + 16, bottom - A - 16, false, true)
-}
-
-const same = (a: Pos, b: Pos) => Math.abs(a.x - b.x) < 1 && Math.abs(a.y - b.y) < 1 && a.above === b.above && a.left === b.left && a.target === b.target
 
 /**
- * El capitán: acompaña al alumno y se acerca al control que corresponde.
- * Se puede arrastrar; una vez movido a mano se queda ahí hasta que se le pida
- * volver a acompañar los botones.
+ * El capitán habla desde su propio lugar arriba del mímico, sin tapar nada.
+ * Lo que hay que tocar lo marca el pulso azul en el control.
  */
-export function Captain({ label, text, go, wait, stepKey }: Props) {
-  const [pos, setPos] = useState<Pos>(() => rest())
-  const [pinned, setPinned] = useState<{ x: number; y: number } | null>(null)
-  const [open, setOpen] = useState(true)
-  const [dragging, setDragging] = useState(false)
-  const drag = useRef<{ dx: number; dy: number; sx: number; sy: number; moved: boolean } | null>(null)
-  const posRef = useRef(pos)
-  posRef.current = pos
-
-  // reabrir el globo en cada paso nuevo
-  useEffect(() => setOpen(true), [stepKey])
-
-  const measure = () => {
-    if (drag.current) return
-    const next = pinned ? place(pinned.x, pinned.y, false) : (() => {
-      const t = findTarget()
-      return !t ? rest() : t.pop ? besidePopup(t.r, t.pop) : near(t.r)
-    })()
-    if (!same(next, posRef.current)) setPos(next)
-  }
-
-  // medir después de cada render (la simulación re-renderiza varias veces por segundo)
-  useLayoutEffect(measure)
-
-  useEffect(() => {
-    let raf = 0
-    const on = () => {
-      cancelAnimationFrame(raf)
-      raf = requestAnimationFrame(measure)
-    }
-    window.addEventListener('scroll', on, true)
-    window.addEventListener('resize', on)
-    return () => {
-      window.removeEventListener('scroll', on, true)
-      window.removeEventListener('resize', on)
-      cancelAnimationFrame(raf)
-    }
-  })
-
-  const onDown = (e: RPointerEvent<HTMLButtonElement>) => {
-    if (e.button !== 0) return
-    e.currentTarget.setPointerCapture(e.pointerId)
-    drag.current = { dx: e.clientX - pos.x, dy: e.clientY - pos.y, sx: e.clientX, sy: e.clientY, moved: false }
-  }
-  const onMove = (e: RPointerEvent<HTMLButtonElement>) => {
-    const d = drag.current
-    if (!d) return
-    if (!d.moved && Math.hypot(e.clientX - d.sx, e.clientY - d.sy) < 5) return
-    if (!d.moved) {
-      d.moved = true
-      setDragging(true)
-    }
-    setPos(place(e.clientX - d.dx, e.clientY - d.dy, false))
-  }
-  const onUp = () => {
-    const d = drag.current
-    drag.current = null
-    setDragging(false)
-    if (!d) return
-    if (d.moved) setPinned({ x: posRef.current.x, y: posRef.current.y })
-    else setOpen((o) => !o)
-  }
-
-  const cls = ['captain', pos.above ? 'above' : 'below', pos.left ? 'left' : 'right', dragging ? 'dragging' : '', pos.target ? 'at-target' : 'resting', pinned ? 'pinned' : '']
+export function Captain({ label, text, go, wait, waiting, stepKey }: Props) {
   return (
-    <div className={cls.join(' ')} style={{ transform: `translate(${pos.x}px, ${pos.y}px)` }}>
-      <button
-        className="captain-face"
-        aria-label={open ? 'Capitán. Tocá para plegar el globo o arrastralo para moverlo' : 'Capitán. Tocá para ver qué hacer'}
-        aria-expanded={open}
-        onPointerDown={onDown}
-        onPointerMove={onMove}
-        onPointerUp={onUp}
-        onPointerCancel={onUp}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault()
-            setOpen((o) => !o)
-          }
-        }}
-      >
+    <div className={`captain-dock ${waiting ? 'is-waiting' : ''}`}>
+      <div className="captain-face" key={stepKey} aria-hidden="true">
         <CaptainFace />
-      </button>
-      {open && (
-        <div className="captain-bubble" key={stepKey} role="status" aria-live="polite" style={{ width: `min(${BW}px, calc(100vw - ${A + 3 * GAP}px))` }}>
-          <span className="captain-step">{label}</span>
-          <span className="captain-text">{text}</span>
-          {go && <span className="captain-go">{go}</span>}
-          {wait && <span className="captain-wait">{wait}</span>}
-          {pinned && (
-            <button className="captain-follow small" onClick={() => setPinned(null)}>
-              Volver a guiarme
-            </button>
-          )}
-        </div>
-      )}
+      </div>
+      <div className="captain-bubble" key={`b${stepKey}`} role="status" aria-live="polite">
+        <span className="captain-step">{label}</span>
+        <span className="captain-text">{text}</span>
+        {go && <span className="captain-go">{go}</span>}
+        {wait && <span className="captain-wait">{wait}</span>}
+      </div>
     </div>
   )
 }

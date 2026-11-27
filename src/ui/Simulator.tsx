@@ -110,6 +110,16 @@ export function Simulator({ exercise, hints, onFinish, onExit }: Props) {
               </button>
             ))}
           </div>
+          {g && (
+            <Captain
+              stepKey={allDone ? 'fin' : String(firstPending)}
+              label={allDone ? 'Listo' : `Paso ${firstPending + 1} de ${steps.length}`}
+              text={allDone ? 'Completaste todos los pasos. Tocá Finalizar para ver tu nota.' : steps[firstPending].text}
+              go={goTab ? `Primero andá a la pestaña ${goTab.label}.` : undefined}
+              wait={g.wait}
+              waiting={!allDone && (g.targets.length === 0 || !!g.wait)}
+            />
+          )}
           <div className="view" key={view}>
             {view === 'lineas' && (
               <>
@@ -206,16 +216,6 @@ export function Simulator({ exercise, hints, onFinish, onExit }: Props) {
           )}
         </aside>
       </div>
-
-      {g && (
-        <Captain
-          stepKey={allDone ? 'fin' : String(firstPending)}
-          label={allDone ? 'Listo' : `Paso ${firstPending + 1} de ${steps.length}`}
-          text={allDone ? 'Completaste todos los pasos. Tocá Finalizar para ver tu nota.' : steps[firstPending].text}
-          go={goTab ? `Primero andá a la pestaña ${goTab.label}.` : undefined}
-          wait={g.wait}
-        />
-      )}
 
       {confirm && (
         <div className="modal-back" onClick={() => setConfirm(false)}>

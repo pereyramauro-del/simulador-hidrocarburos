@@ -45,7 +45,7 @@ export function ValvePopover({ id, s, anchor, act, onClose }: Props) {
       const t = e.target as Element
       if (ref.current?.contains(t)) return
       // tocar otra válvula o tanque la selecciona; no hace falta cerrar antes
-      if (t.closest('.mimic .clickable') || t.closest('.captain')) return
+      if (t.closest('.mimic .clickable')) return
       onClose()
     }
     document.addEventListener('keydown', onKey)
