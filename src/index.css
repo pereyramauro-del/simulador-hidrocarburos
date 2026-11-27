@@ -110,6 +110,15 @@ input[type='checkbox'] { accent-color: var(--operator); width: 1.05em; height: 1
 .home-lede { font-size: var(--s1); color: var(--ink-2); margin: 0.6rem 0 1.6rem; max-width: 56ch; line-height: 1.4; }
 .hero-plan { margin: 0 0 0.5rem; }
 .hero-caption { font-size: 0.875rem; color: var(--ink-2); margin-bottom: 2.2rem; }
+.resume {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 1rem 2rem;
+  margin: 0 0 1.6rem; padding: 1rem 1.2rem; background: #fff;
+  border: 1px solid var(--operator); border-left-width: 5px; border-radius: 4px;
+  animation: rise 0.5s cubic-bezier(0.2, 0.7, 0.2, 1) both; animation-delay: 0.2s;
+}
+.resume h2 { font-size: var(--s2, 1.25rem); margin: 0 0 0.2rem; color: var(--operator); }
+.resume p { margin: 0; }
+.resume p + p { margin-top: 0.15rem; }
 .student { display: flex; gap: 0.8rem 1.2rem; align-items: center; flex-wrap: wrap; padding: 0.9rem 0; border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); margin-bottom: 2.4rem; }
 .student label { display: flex; gap: 0.6rem; align-items: center; font-weight: 600; font-stretch: var(--narrow); }
 .student input { min-width: 17em; }

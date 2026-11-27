@@ -2,9 +2,10 @@
 import { VLCC } from './ship'
 import { applyAction, createState, step, type Action, type SimState } from './engine'
 import { exerciseById } from './exercises'
+import { replay } from './replay'
 
 export type ToWorker =
-  | { type: 'init'; exerciseId: string }
+  | { type: 'init'; exerciseId: string; resume?: { actions: TimedAction[]; t: number; factor: number } }
   | { type: 'action'; action: Action }
   | { type: 'speed'; factor: number }
   | { type: 'pause'; paused: boolean }
@@ -39,10 +40,17 @@ self.onmessage = (e: MessageEvent<ToWorker>) => {
   if (m.type === 'init') {
     const ex = exerciseById(m.exerciseId)
     if (!ex?.initial) return
-    state = createState(VLCC, ex.initial())
-    actions = []
+    if (m.resume) {
+      // seguir una práctica guardada: se reproduce hasta el mismo instante
+      state = replay(VLCC, ex.initial(), m.resume.actions, m.resume.t)
+      actions = [...m.resume.actions]
+      factor = m.resume.factor
+    } else {
+      state = createState(VLCC, ex.initial())
+      actions = []
+      factor = 1
+    }
     paused = false
-    factor = 1
     acc = 0
   } else if (m.type === 'action' && state) {
     actions.push({ t: state.t, action: m.action })

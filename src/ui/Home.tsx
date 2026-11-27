@@ -1,7 +1,8 @@
 import { useRef, useState } from 'react'
-import { EXERCISES, type Exercise } from '../sim/exercises'
+import { EXERCISES, exerciseById, type Exercise } from '../sim/exercises'
 import { VLCC } from '../sim/ship'
-import { exportBackup, importBackup, loadName, loadResults, saveName } from '../storage'
+import { clearSession, exportBackup, importBackup, loadName, loadResults, loadSession, saveName, type SavedSession } from '../storage'
+import { clock } from './format'
 import { HULL_BOTTOM, ShipPlan } from './ShipPlan'
 
 // Bloques del Curso Modelo OMI 2.06 con sus horas sugeridas
@@ -16,8 +17,23 @@ const BLOCKS = [
 // Portada: el buque cargado al 98% en todos los tanques de carga
 const HERO_FILLS = VLCC.tanks.map((t) => (t.kind === 'ballast' ? 0 : 0.98))
 
-export function Home({ onStart, offlineReady }: { onStart: (ex: Exercise, hints: boolean) => void; offlineReady: boolean }) {
+const ago = (ms: number) => {
+  const min = Math.round((Date.now() - ms) / 60000)
+  if (min < 1) return 'recién'
+  if (min < 60) return `hace ${min} min`
+  const h = Math.round(min / 60)
+  if (h < 24) return `hace ${h} h`
+  const d = Math.round(h / 24)
+  return d === 1 ? 'ayer' : `hace ${d} días`
+}
+
+export function Home({ onStart, offlineReady }: { onStart: (ex: Exercise, hints: boolean, resume?: SavedSession) => void; offlineReady: boolean }) {
   const [name, setName] = useState(loadName())
+  const [session, setSession] = useState(() => {
+    const s = loadSession()
+    return s && exerciseById(s.exerciseId)?.available ? s : null
+  })
+  const sessionEx = session ? exerciseById(session.exerciseId)! : null
   const [briefing, setBriefing] = useState<Exercise | null>(null)
   const [hints, setHints] = useState(true)
   const [msg, setMsg] = useState<string | null>(null)
@@ -38,7 +54,14 @@ export function Home({ onStart, offlineReady }: { onStart: (ex: Exercise, hints:
         <span className="ex-sum">{ex.summary}</span>
         <span className="ex-act">
           {b !== null && <span className={`grade ${b >= 70 ? 'pass' : 'fail'}`}>Mejor nota {b}</span>}
-          {ex.available ? (
+          {ex.available && session?.exerciseId === ex.id ? (
+            <>
+              <button className="primary" onClick={() => onStart(ex, session.hints, session)}>
+                Continuar
+              </button>
+              <button onClick={() => setBriefing(ex)}>Empezar de nuevo</button>
+            </>
+          ) : ex.available ? (
             <button className="primary" onClick={() => setBriefing(ex)}>
               Empezar
             </button>
@@ -67,6 +90,35 @@ export function Home({ onStart, offlineReady }: { onStart: (ex: Exercise, hints:
         </svg>
       </div>
       <p className="hero-caption">El buque de los ejercicios: 4 tanques centrales, 5 pares laterales con los slops, lastre segregado y 4 líneas de carga.</p>
+
+      {session && sessionEx && (
+        <section className="resume" aria-labelledby="resume-title">
+          <div>
+            <h2 id="resume-title">Seguí donde lo dejaste</h2>
+            <p>
+              {sessionEx.number ? `Ejercicio ${sessionEx.number}: ` : ''}
+              {sessionEx.title}
+            </p>
+            <p className="quiet small-text">
+              Tiempo simulado {clock(session.t)}
+              {session.hints && sessionEx.steps ? `, paso ${Math.min(session.progress + 1, sessionEx.steps.length)} de ${sessionEx.steps.length}` : ''}. Guardado {ago(session.savedAt)}.
+            </p>
+          </div>
+          <div className="row">
+            <button className="primary" onClick={() => onStart(sessionEx, session.hints, session)}>
+              Continuar
+            </button>
+            <button
+              onClick={() => {
+                clearSession()
+                setSession(null)
+              }}
+            >
+              Descartar
+            </button>
+          </div>
+        </section>
+      )}
 
       <div className="student">
         <label>
@@ -179,6 +231,11 @@ export function Home({ onStart, offlineReady }: { onStart: (ex: Exercise, hints:
                 <input type="checkbox" checked={hints} onChange={(e) => setHints(e.target.checked)} />
                 Mostrar los pasos como guía (la nota se calcula igual)
               </label>
+            )}
+            {session && (
+              <p className="quiet small-text">
+                {session.exerciseId === briefing.id ? 'Al comenzar de cero se descarta la práctica guardada de este ejercicio.' : 'Tenés otra práctica sin terminar; al comenzar esta, la guardada se reemplaza.'}
+              </p>
             )}
             <div className="row">
               <button className="primary" onClick={() => onStart(briefing, hints)}>

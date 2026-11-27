@@ -11,6 +11,47 @@ export interface ResultRecord {
 
 const KEY_RESULTS = 'sh.resultados.v1'
 const KEY_NAME = 'sh.alumno.v1'
+const KEY_SESSION = 'sh.sesion.v1'
+
+/**
+ * Práctica sin terminar. El motor es determinista, así que alcanza con las
+ * acciones del alumno y el tiempo simulado para reconstruir el estado exacto.
+ */
+export interface SavedSession {
+  v: 1
+  exerciseId: string
+  hints: boolean
+  actions: { t: number; action: unknown }[]
+  t: number
+  factor: number
+  progress: number
+  savedAt: number
+}
+
+export function loadSession(): SavedSession | null {
+  try {
+    const s = JSON.parse(localStorage.getItem(KEY_SESSION) ?? 'null')
+    return s?.v === 1 && typeof s.t === 'number' && Array.isArray(s.actions) ? s : null
+  } catch {
+    return null
+  }
+}
+
+export function saveSession(s: SavedSession) {
+  try {
+    localStorage.setItem(KEY_SESSION, JSON.stringify(s))
+  } catch {
+    /* sin almacenamiento disponible */
+  }
+}
+
+export function clearSession() {
+  try {
+    localStorage.removeItem(KEY_SESSION)
+  } catch {
+    /* ignorar */
+  }
+}
 
 export function loadResults(): ResultRecord[] {
   try {

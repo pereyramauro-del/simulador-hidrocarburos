@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { advance, type Exercise } from '../sim/exercises'
 import type { SimState } from '../sim/engine'
 import type { TimedAction } from '../sim/worker'
@@ -9,6 +9,7 @@ import { TanksView } from './TanksView'
 import { clock } from './format'
 import { GButton, GuideContext, viewOf } from './guide'
 import { Captain } from './Captain'
+import { clearSession, saveSession, type SavedSession } from '../storage'
 
 type View = 'lineas' | 'terminal' | 'tanques' | 'registro'
 const VIEWS: { id: View; label: string }[] = [
@@ -22,16 +23,45 @@ const SPEEDS = [1, 5, 20, 60]
 interface Props {
   exercise: Exercise
   hints: boolean
+  /** práctica guardada para seguir donde quedó */
+  resume?: SavedSession
   onFinish: (s: SimState, actions: TimedAction[]) => void
   onExit: () => void
 }
 
-export function Simulator({ exercise, hints, onFinish, onExit }: Props) {
-  const { snap, act, setSpeed, setPaused } = useSim(exercise.id)
+export function Simulator({ exercise, hints, resume, onFinish, onExit }: Props) {
+  const { snap, act, setSpeed, setPaused } = useSim(exercise.id, resume as { actions: TimedAction[]; t: number; factor: number } | undefined)
   const [view, setView] = useState<View>('lineas')
   const [selected, setSelected] = useState<string | null>(null)
   const [confirm, setConfirm] = useState(false)
-  const progress = useRef(0)
+  const progress = useRef(resume?.progress ?? 0)
+
+  // Guardado automático: cada pocos segundos, al ocultar o cerrar la página y al salir al menú.
+  const latest = useRef(snap)
+  latest.current = snap
+  const finished = useRef(false)
+  const lastSave = useRef(0)
+  const save = () => {
+    const sn = latest.current
+    if (finished.current || !sn || sn.state.t === 0) return
+    saveSession({ v: 1, exerciseId: exercise.id, hints, actions: sn.actions, t: sn.state.t, factor: sn.factor, progress: progress.current, savedAt: Date.now() })
+    lastSave.current = Date.now()
+  }
+  useEffect(() => {
+    if (snap && Date.now() - lastSave.current > 3000) save()
+  }, [snap])
+  useEffect(() => {
+    const onHide = () => {
+      if (document.visibilityState === 'hidden') save()
+    }
+    window.addEventListener('pagehide', save)
+    document.addEventListener('visibilitychange', onHide)
+    return () => {
+      window.removeEventListener('pagehide', save)
+      document.removeEventListener('visibilitychange', onHide)
+      save()
+    }
+  }, [])
 
   if (!snap) return <div className="home">Cargando simulador…</div>
   const s = snap.state
@@ -58,7 +88,7 @@ export function Simulator({ exercise, hints, onFinish, onExit }: Props) {
     <GuideContext.Provider value={guide}>
     <div className="sim">
       <div className="topbar">
-        <button className="small" onClick={onExit} title="Volver al menú sin guardar">
+        <button className="small" onClick={onExit} title="Volver al menú; tu avance queda guardado">
           Menú
         </button>
         <span className="title">
@@ -223,7 +253,14 @@ export function Simulator({ exercise, hints, onFinish, onExit }: Props) {
             <h2>¿Finalizar el ejercicio?</h2>
             <p>{exercise.evaluated ? 'Se calcula la nota con el estado actual del buque y se genera el informe.' : 'Se muestra el resumen de la práctica.'}</p>
             <div className="row">
-              <button className="primary" onClick={() => onFinish(s, snap.actions)}>
+              <button
+                className="primary"
+                onClick={() => {
+                  finished.current = true
+                  clearSession()
+                  onFinish(s, snap.actions)
+                }}
+              >
                 Finalizar y ver informe
               </button>
               <button onClick={() => setConfirm(false)}>Seguir operando</button>
