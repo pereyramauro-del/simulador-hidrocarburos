@@ -3,6 +3,7 @@ import type { Action, SimState, TerminalState } from '../sim/engine'
 import { P_ESD, P_HIGH } from '../sim/engine'
 import { VLCC } from '../sim/ship'
 import { clock, fmt0, fmt1 } from './format'
+import { GButton, useGuide } from './guide'
 
 const STATE_TEXT: Record<TerminalState, string> = {
   sin_manguera: 'Esperando conexión de manguera',
@@ -16,6 +17,7 @@ const STATE_TEXT: Record<TerminalState, string> = {
 
 export function TerminalView({ s, act }: { s: SimState; act: (a: Action) => void }) {
   const [rate, setRate] = useState(5000)
+  const guideRate = useGuide('rate')
   const term = s.terminal
   const chatRef = useRef<HTMLDivElement>(null)
   const msgs = s.log.filter((l) => l.com || l.text.startsWith('ALARMA: Parada'))
@@ -59,8 +61,9 @@ export function TerminalView({ s, act }: { s: SimState; act: (a: Action) => void
             const avail = s.availableHoses.includes(l.id)
             const on = s.hoses[l.id]
             return (
-              <button
+              <GButton
                 key={l.id}
+                id={`hose:${l.id}`}
                 className={on ? 'on' : undefined}
                 aria-pressed={on}
                 disabled={!avail}
@@ -68,7 +71,7 @@ export function TerminalView({ s, act }: { s: SimState; act: (a: Action) => void
                 onClick={() => act({ type: 'hose', line: l.id, connected: !on })}
               >
                 {on ? `Desconectar L${l.id}` : avail ? `Conectar L${l.id}` : `L${l.id} sin manguera`}
-              </button>
+              </GButton>
             )
           })}
         </div>
@@ -77,22 +80,22 @@ export function TerminalView({ s, act }: { s: SimState; act: (a: Action) => void
       <div className="panel">
         <h2>Comunicaciones con la terminal</h2>
         <div className="row" style={{ marginBottom: '0.6rem' }}>
-          <button onClick={() => act({ type: 'msg', kind: 'listo' })}>Avisar: buque listo</button>
+          <GButton id="msg:listo" onClick={() => act({ type: 'msg', kind: 'listo' })}>Avisar: buque listo</GButton>
         </div>
         <div className="row" style={{ marginBottom: '0.6rem' }}>
           <label className="row">
             Caudal
-            <input type="number" min={0} max={term.maxRate} step={500} value={rate} onChange={(e) => setRate(Number(e.target.value))} style={{ width: '7.5em' }} />
+            <input className={guideRate ? 'guide' : undefined} type="number" min={0} max={term.maxRate} step={500} value={rate} onChange={(e) => setRate(Number(e.target.value))} style={{ width: '7.5em' }} />
             m³/h
           </label>
-          <button onClick={() => act({ type: 'msg', kind: 'iniciar', rate })}>Pedir inicio</button>
-          <button onClick={() => act({ type: 'msg', kind: 'caudal', rate })}>Pedir cambio de caudal</button>
+          <GButton id="msg:iniciar" onClick={() => act({ type: 'msg', kind: 'iniciar', rate })}>Pedir inicio</GButton>
+          <GButton id="msg:caudal" onClick={() => act({ type: 'msg', kind: 'caudal', rate })}>Pedir cambio de caudal</GButton>
         </div>
         <div className="row">
-          <button onClick={() => act({ type: 'msg', kind: 'ultimo' })}>Avisar: último tanque</button>
-          <button className="danger" onClick={() => act({ type: 'msg', kind: 'parar' })}>
+          <GButton id="msg:ultimo" onClick={() => act({ type: 'msg', kind: 'ultimo' })}>Avisar: último tanque</GButton>
+          <GButton id="msg:parar" className="danger" onClick={() => act({ type: 'msg', kind: 'parar' })}>
             Pedir parada
-          </button>
+          </GButton>
         </div>
         <div className="radio-log" ref={chatRef} aria-live="polite">
           {msgs.length === 0 && <p className="quiet small-text" style={{ padding: '0.4rem 0' }}>Todavía no hubo comunicaciones.</p>}

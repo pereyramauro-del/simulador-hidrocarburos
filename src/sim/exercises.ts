@@ -7,11 +7,43 @@ import type { InitialCondition, SimState } from './engine'
 import { fillOf } from './engine'
 import { evaluateEx3, type Evaluation } from './evaluation'
 
+export interface GuideUI {
+  /** válvula seleccionada en el panel */
+  selected: string | null
+  /** factor de tiempo actual */
+  factor: number
+}
+
+export interface Guide {
+  /** controles a resaltar (ver src/ui/guide.tsx) */
+  targets: string[]
+  /** si no hay nada que tocar: qué se está esperando */
+  wait?: string
+}
+
 export interface TutorialStep {
   text: string
   view?: 'lineas' | 'terminal' | 'tanques' | 'registro'
   done: (s: SimState) => boolean
+  guide?: (s: SimState, ui: GuideUI) => Guide
 }
+
+/** Qué tocar para dejar una válvula como se pide: primero la válvula, después el botón del panel. */
+function valveTask(s: SimState, ui: GuideUI, id: string, want: 'abrir' | 'cerrar' | number): string[] | null {
+  const v = s.valves[id]
+  const ok = want === 'abrir' ? v === 1 : want === 'cerrar' ? v === 0 : v > 0 && v <= want + 1e-9
+  if (ok) return null
+  if (ui.selected !== id) return [`valve:${id}`]
+  return [want === 'abrir' ? 'panel:open' : want === 'cerrar' ? 'panel:close' : `panel:${Math.round(want * 100)}`]
+}
+
+const first = (...tasks: (string[] | null)[]) => tasks.find((t) => t) ?? []
+
+/** Espera: sugiere acelerar el tiempo si va lento */
+const waiting = (ui: GuideUI, wait: string, extra: string[] = [], speed = 20): Guide => ({
+  targets: [...extra, ...(ui.factor < speed ? [`speed:${speed}`] : [])],
+  wait,
+})
 
 export interface Exercise {
   id: string
@@ -53,6 +85,16 @@ const freeInitial = (): InitialCondition => ({
   maxRate: 20000,
 })
 
+/**
+ * Avance de los pasos: solo hacia adelante. Un paso cumplido no vuelve a quedar
+ * pendiente aunque después cambie el estado (por ejemplo, cerrar el manifold al final).
+ */
+export function advance(steps: TutorialStep[], s: SimState, from: number) {
+  let i = from
+  while (i < steps.length && steps[i].done(s)) i++
+  return i
+}
+
 const sent = (s: SimState, kind: string) => s.events.some((e) => e.type === 'mensaje' && e.data?.kind === kind)
 
 export const EXERCISES: Exercise[] = [
@@ -82,17 +124,31 @@ export const EXERCISES: Exercise[] = [
     ],
     initial: ex3Initial,
     steps: [
-      { text: 'Conectá la manguera al manifold de la línea 1.', view: 'terminal', done: (s) => s.hoses[1] },
-      { text: 'Alineá la línea 1: abrí la válvula de bajante L1 y la válvula de fondo de CT1.', view: 'lineas', done: (s) => s.valves.DROP1 > 0 && s.valves.BV_CT1 > 0 },
-      { text: 'Avisá a la terminal que el buque está listo para recibir.', view: 'terminal', done: (s) => sent(s, 'listo') },
-      { text: 'Esperá la confirmación de la terminal.', view: 'terminal', done: (s) => s.events.some((e) => e.type === 'terminal_autoriza') },
-      { text: 'Abrí la válvula de manifold L1.', view: 'lineas', done: (s) => s.valves.MF1 > 0 },
-      { text: 'Pedí iniciar el bombeo a caudal reducido (hasta 5.000 m³/h).', view: 'terminal', done: (s) => s.events.some((e) => e.type === 'terminal_inicia') },
-      { text: 'Verificá en Líneas o Tanques que la carga entra solo en CT1. Si querés, pedí subir el caudal vigilando la presión (con un solo tanque, no más de unos 6.000 m³/h).', view: 'tanques', done: (s) => fillOf(VLCC, s, 'CT1') > 0.3 },
-      { text: 'Con un vacío cercano a 3 m (≈ 88%), pedí caudal de topeo (por ejemplo 2.000 m³/h). Cuando el caudal haya bajado, estrangulá la válvula de CT1 al 50%: si la cerrás antes, sube la presión.', view: 'lineas', done: (s) => s.valves.BV_CT1 <= 0.5 && s.terminal.target <= 2500 && fillOf(VLCC, s, 'CT1') > 0.85 },
-      { text: 'Avisá a la terminal que es el último tanque. Al llegar al 95%, estrangulá CT1 al 25%.', view: 'terminal', done: (s) => sent(s, 'ultimo') && s.valves.BV_CT1 <= 0.25 },
-      { text: 'Pedí la parada antes del 98%, teniendo en cuenta la demora de la terminal.', view: 'terminal', done: (s) => sent(s, 'parar') },
-      { text: 'Con el bombeo detenido, cerrá el manifold L1, el bajante L1 y la válvula de CT1. Después tocá Finalizar.', view: 'lineas', done: (s) => s.terminal.state === 'detenido' && s.valves.MF1 === 0 && s.valves.BV_CT1 === 0 && s.valves.DROP1 === 0 },
+      { text: 'Conectá la manguera al manifold de la línea 1.', view: 'terminal', done: (s) => s.hoses[1], guide: () => ({ targets: ['hose:1'] }) },
+      { text: 'Alineá la línea 1: abrí la válvula de bajante L1 y la válvula de fondo de CT1.', view: 'lineas', done: (s) => s.valves.DROP1 > 0 && s.valves.BV_CT1 > 0, guide: (s, ui) => ({ targets: first(valveTask(s, ui, 'DROP1', 'abrir'), valveTask(s, ui, 'BV_CT1', 'abrir')) }) },
+      { text: 'Avisá a la terminal que el buque está listo para recibir.', view: 'terminal', done: (s) => sent(s, 'listo'), guide: () => ({ targets: ['msg:listo'] }) },
+      { text: 'Esperá la confirmación de la terminal.', view: 'terminal', done: (s) => s.events.some((e) => e.type === 'terminal_autoriza'), guide: (_s, ui) => waiting(ui, 'La terminal responde en unos 20 segundos.') },
+      { text: 'Abrí la válvula de manifold L1.', view: 'lineas', done: (s) => s.valves.MF1 > 0, guide: (s, ui) => ({ targets: first(valveTask(s, ui, 'MF1', 'abrir')) }) },
+      { text: 'Pedí iniciar el bombeo a caudal reducido (hasta 5.000 m³/h).', view: 'terminal', done: (s) => s.events.some((e) => e.type === 'terminal_inicia'), guide: (s, ui) => (s.terminal.pending.some((p) => p.kind === 'iniciar') ? waiting(ui, 'La terminal está por iniciar el bombeo.') : { targets: ['rate', 'msg:iniciar'] }) },
+      { text: 'Verificá en Líneas o Tanques que la carga entra solo en CT1. Si querés, pedí subir el caudal vigilando la presión (con un solo tanque, no más de unos 6.000 m³/h).', view: 'tanques', done: (s) => fillOf(VLCC, s, 'CT1') > 0.3, guide: (_s, ui) => waiting(ui, 'La carga está entrando en CT1. Acelerá el tiempo y fijate que no entre en otro tanque.', ['view:tanques'], 60) },
+      { text: 'Con un vacío cercano a 3 m (≈ 88%), pedí caudal de topeo (por ejemplo 2.000 m³/h). Cuando el caudal haya bajado, estrangulá la válvula de CT1 al 50%: si la cerrás antes, sube la presión.', view: 'lineas', done: (s) => s.valves.BV_CT1 <= 0.5 && s.terminal.target <= 2500 && fillOf(VLCC, s, 'CT1') > 0.85, guide: (s, ui) => {
+        const f = fillOf(VLCC, s, 'CT1')
+        if (f < 0.85) return waiting(ui, `CT1 va por ${Math.round(f * 100)}%. Seguí cargando hasta cerca del 88%.`, ['view:tanques'], 60)
+        const slow = ui.factor > 5 ? ['speed:5'] : []
+        if (s.terminal.target > 2500 && !s.terminal.pending.some((p) => p.kind === 'caudal')) return { targets: ['rate', 'msg:caudal', ...slow] }
+        if (s.terminal.pending.some((p) => p.kind === 'caudal') || s.terminal.rate > 2500) return { targets: slow, wait: 'La terminal está bajando el caudal. Cuando baje, estrangulá CT1.' }
+        return { targets: [...first(valveTask(s, ui, 'BV_CT1', 0.5)), ...slow] }
+      } },
+      { text: 'Avisá a la terminal que es el último tanque. Al llegar al 95%, estrangulá CT1 al 25%.', view: 'terminal', done: (s) => sent(s, 'ultimo') && s.valves.BV_CT1 <= 0.25, guide: (s, ui) => {
+        if (!sent(s, 'ultimo')) return { targets: ['msg:ultimo'] }
+        if (fillOf(VLCC, s, 'CT1') < 0.95) return { targets: ['view:tanques', ...(ui.factor !== 20 ? ['speed:20'] : [])], wait: 'Al llegar al 95% vas a estrangular CT1 al 25%. A ×20 llegás a tiempo de reaccionar.' }
+        return { targets: first(valveTask(s, ui, 'BV_CT1', 0.25)) }
+      } },
+      { text: 'Pedí la parada antes del 98%, teniendo en cuenta la demora de la terminal.', view: 'terminal', done: (s) => sent(s, 'parar'), guide: () => ({ targets: ['msg:parar'] }) },
+      { text: 'Con el bombeo detenido, cerrá el manifold L1, el bajante L1 y la válvula de CT1. Después tocá Finalizar.', view: 'lineas', done: (s) => s.terminal.state === 'detenido' && s.valves.MF1 === 0 && s.valves.BV_CT1 === 0 && s.valves.DROP1 === 0, guide: (s, ui) => {
+        if (s.terminal.state !== 'detenido') return waiting(ui, 'La terminal está parando las bombas: tarda unos 30 segundos más la rampa.')
+        return { targets: first(valveTask(s, ui, 'MF1', 'cerrar'), valveTask(s, ui, 'DROP1', 'cerrar'), valveTask(s, ui, 'BV_CT1', 'cerrar')) }
+      } },
     ],
     evaluate: evaluateEx3,
     canFinish: () => true,

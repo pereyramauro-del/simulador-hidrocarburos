@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { VLCC, cap100, tankById } from './ship'
 import { applyAction, createState, fillOf, step, type Action, type SimState } from './engine'
-import { exerciseById } from './exercises'
+import { advance, exerciseById } from './exercises'
 import { evaluateEx3 } from './evaluation'
 import { replay } from './replay'
 import type { TimedAction } from './worker'
@@ -104,5 +104,41 @@ describe('motor de carga', () => {
     const r = replay(VLCC, ex3.initial!(), log, s.t)
     expect(r.tanks.map((x) => x.volume)).toEqual(s.tanks.map((x) => x.volume))
     expect(r.events.length).toBe(s.events.length)
+  })
+})
+
+describe('guía de pasos del ejercicio 3', () => {
+  it('seguir solo lo que la guía resalta lleva a 100', () => {
+    const steps = ex3.steps!
+    const s = createState(VLCC, ex3.initial!())
+    let selected: string | null = null
+    let clicks = 0
+    let i = 0
+    for (let guard = 0; guard < 200000; guard++) {
+      i = advance(steps, s, i)
+      if (i === steps.length) break
+      const g = steps[i].guide!(s, { selected, factor: 20 })
+      const t = g.targets.find((x) => !x.startsWith('view:') && !x.startsWith('speed:') && x !== 'rate')
+      if (!t) {
+        step(VLCC, s) // nada que tocar: avanza el tiempo
+        continue
+      }
+      clicks++
+      if (t.startsWith('hose:')) applyAction(VLCC, s, { type: 'hose', line: Number(t.slice(5)), connected: true })
+      else if (t.startsWith('valve:')) selected = t.slice(6)
+      else if (t === 'panel:open') applyAction(VLCC, s, { type: 'valve', id: selected!, opening: 1 })
+      else if (t === 'panel:close') applyAction(VLCC, s, { type: 'valve', id: selected!, opening: 0 })
+      else if (t.startsWith('panel:')) applyAction(VLCC, s, { type: 'valve', id: selected!, opening: Number(t.slice(6)) / 100 })
+      else if (t.startsWith('msg:')) {
+        const kind = t.slice(4) as 'listo' | 'iniciar' | 'caudal' | 'ultimo' | 'parar'
+        applyAction(VLCC, s, { type: 'msg', kind, rate: kind === 'iniciar' ? 5000 : kind === 'caudal' ? 2000 : undefined })
+      } else throw new Error(`destino desconocido: ${t}`)
+      step(VLCC, s)
+    }
+    expect(i).toBe(steps.length)
+    const ev = evaluateEx3(VLCC, s)
+    expect(ev.items.filter((x) => !x.ok)).toEqual([])
+    expect(ev.score).toBe(100)
+    expect(clicks).toBeLessThan(30)
   })
 })

@@ -3,6 +3,7 @@ import type { SimState } from '../sim/engine'
 import { VLCC, cap100 } from '../sim/ship'
 import { fmt0, fmt1 } from './format'
 import { HULL_BOTTOM, ShipPlan, lineColor, px } from './ShipPlan'
+import { useGuide } from './guide'
 
 const ship = VLCC
 const PID_TOP = HULL_BOTTOM + 70
@@ -19,7 +20,8 @@ interface Props {
   estrangulada = medio llena con su porcentaje. Sin rojo ni verde: esos
   colores quedan para las alarmas.
 */
-export function ValveSymbol({ cx, cy, opening, selected, onClick, label, size = 9 }: { cx: number; cy: number; opening: number; selected: boolean; onClick: () => void; label: string; size?: number }) {
+export function ValveSymbol({ valveId, cx, cy, opening, selected, onClick, label, size = 9 }: { valveId: string; cx: number; cy: number; opening: number; selected: boolean; onClick: () => void; label: string; size?: number }) {
+  const guided = useGuide(`valve:${valveId}`)
   const state = opening === 0 ? 'cerrada' : opening === 1 ? 'abierta' : `abierta al ${Math.round(opening * 100)}%`
   const body = opening === 0 ? '#f4f5f5' : opening === 1 ? 'var(--ink)' : 'var(--ink-2)'
   const onKey = (e: KeyboardEvent) => {
@@ -31,6 +33,7 @@ export function ValveSymbol({ cx, cy, opening, selected, onClick, label, size = 
   return (
     <g className="clickable valve" onClick={onClick} onKeyDown={onKey} role="button" tabIndex={0} aria-label={`${label}, ${state}`} aria-pressed={selected}>
       <rect x={cx - size - 6} y={cy - size - 6} width={2 * size + 12} height={2 * size + 12} fill="transparent" />
+      {guided && <circle className="guide-pulse" cx={cx} cy={cy} r={size + 7} />}
       {selected && <circle className="select-ring" cx={cx} cy={cy} r={size + 6} fill="none" stroke="var(--operator)" strokeWidth={2.5} />}
       <circle className="focus-ring" cx={cx} cy={cy} r={size + 6} fill="none" stroke="transparent" />
       <g className="pop">
@@ -84,11 +87,11 @@ export function LinesView({ s, selected, onSelect }: Props) {
             </text>
             <line x1={104} y1={y} x2={xEnd} y2={y} stroke={color} strokeWidth={5} strokeLinecap="round" />
             {flowing && <line x1={104} y1={y} x2={xEnd} y2={y} stroke="var(--crude)" strokeWidth={5} className="flowing" />}
-            <ValveSymbol label={`Válvula de manifold L${l.id}`} cx={142} cy={y} opening={s.valves[`MF${l.id}`]} selected={selected === `MF${l.id}`} onClick={() => onSelect(`MF${l.id}`)} />
+            <ValveSymbol valveId={`MF${l.id}`} label={`Válvula de manifold L${l.id}`} cx={142} cy={y} opening={s.valves[`MF${l.id}`]} selected={selected === `MF${l.id}`} onClick={() => onSelect(`MF${l.id}`)} />
             <text x={142} y={y + 26} fontSize={10.5} textAnchor="middle" className="t-quiet">
               Manifold
             </text>
-            <ValveSymbol label={`Válvula de bajante L${l.id}`} cx={202} cy={y} opening={s.valves[`DROP${l.id}`]} selected={selected === `DROP${l.id}`} onClick={() => onSelect(`DROP${l.id}`)} />
+            <ValveSymbol valveId={`DROP${l.id}`} label={`Válvula de bajante L${l.id}`} cx={202} cy={y} opening={s.valves[`DROP${l.id}`]} selected={selected === `DROP${l.id}`} onClick={() => onSelect(`DROP${l.id}`)} />
             <text x={202} y={y + 26} fontSize={10.5} textAnchor="middle" className="t-quiet">
               Bajante
             </text>
@@ -100,7 +103,7 @@ export function LinesView({ s, selected, onSelect }: Props) {
             </text>
             {tanks.map((t, j) => (
               <g key={t.id}>
-                <ValveSymbol label={`Válvula de fondo ${t.name}`} cx={xs[j]} cy={y} opening={s.valves[`BV_${t.id}`]} selected={selected === `BV_${t.id}`} onClick={() => onSelect(`BV_${t.id}`)} size={8} />
+                <ValveSymbol valveId={`BV_${t.id}`} label={`Válvula de fondo ${t.name}`} cx={xs[j]} cy={y} opening={s.valves[`BV_${t.id}`]} selected={selected === `BV_${t.id}`} onClick={() => onSelect(`BV_${t.id}`)} size={8} />
                 <text x={xs[j]} y={y + 26} fontSize={10.5} textAnchor="middle" className="t-quiet">
                   {t.name}
                 </text>

@@ -1,6 +1,8 @@
 import type { CSSProperties, KeyboardEvent } from 'react'
 import { VLCC, tankLength } from '../sim/ship'
 import { fmt0, fmt1 } from './format'
+import { GuideContext } from './guide'
+import { useContext } from 'react'
 
 const ship = VLCC
 // metros desde la perpendicular de popa → px (manga exagerada ×1,6 para que se lean los rótulos)
@@ -36,6 +38,7 @@ const onKey = (fn: () => void) => (e: KeyboardEvent) => {
 
 /** Plano de tanques del VLCC: casco, cámara de bombas y tanques con su nivel. */
 export function ShipPlan({ fills, flows, selectedTank, onSelectTank, intro, compact }: Props) {
+  const guide = useContext(GuideContext)
   const lcgMin = 55
   const lcgMax = 280
   return (
@@ -113,6 +116,7 @@ export function ShipPlan({ fills, flows, selectedTank, onSelectTank, intro, comp
               stroke={selected ? 'var(--operator)' : alarm ?? (t.line ? lineColor(t.line) : 'var(--equip)')}
               strokeWidth={selected ? 3 : alarm ? 3 : 1.75}
             />
+            {guide.has(`valve:${vId}`) && <rect className="guide-pulse" x={x1 - 2} y={y - 2} width={w + 4} height={h + 4} rx={2} />}
             <g className={intro ? 'label-intro' : undefined} style={style}>
               <TankLabel x={x1 + w / 2} y={y} w={w} h={h} name={isFP ? 'FP' : t.name} fill={fill} flow={flow} />
             </g>

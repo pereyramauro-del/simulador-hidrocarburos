@@ -298,3 +298,33 @@ td.hh { color: var(--alarm-crit); font-weight: 700; }
     transition-duration: 0.001ms !important;
   }
 }
+
+/* ---------- Guía: dónde tocar ahora ---------- */
+/* Un pulso azul de operador alrededor del control que corresponde al paso actual. */
+.guide { position: relative; box-shadow: 0 0 0 2px var(--operator); animation: guide-pulse 1.4s ease-out infinite; }
+button.guide:not(.primary):not(.on) { background: #fff; border-color: var(--operator); }
+.tabs button.guide { box-shadow: none; animation: none; color: var(--operator); border-bottom-color: color-mix(in srgb, var(--operator) 45%, transparent); }
+.tabs button.guide::after { content: ''; position: absolute; top: 0.45rem; right: -0.65rem; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: var(--operator); animation: guide-dot 1.4s ease-out infinite; }
+@keyframes guide-pulse {
+  0% { box-shadow: 0 0 0 2px var(--operator), 0 0 0 2px color-mix(in srgb, var(--operator) 45%, transparent); }
+  100% { box-shadow: 0 0 0 2px var(--operator), 0 0 0 11px color-mix(in srgb, var(--operator) 0%, transparent); }
+}
+@keyframes guide-dot { 0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--operator) 55%, transparent); } 100% { box-shadow: 0 0 0 8px transparent; } }
+.mimic .guide-pulse { fill: none; stroke: var(--operator); stroke-width: 3; pointer-events: none; transform-box: fill-box; transform-origin: center; animation: guide-svg 1.4s ease-out infinite; }
+@keyframes guide-svg { 0% { stroke-opacity: 1; transform: scale(1); } 100% { stroke-opacity: 0; transform: scale(1.35); } }
+rect.guide-pulse { animation-name: guide-svg-rect; }
+@keyframes guide-svg-rect { 0% { stroke-opacity: 1; } 70% { stroke-opacity: 0.15; } 100% { stroke-opacity: 1; } }
+
+/* Franja "Ahora": el paso actual en una línea, arriba del mímico */
+.now { display: grid; grid-template-columns: auto 1fr; gap: 0.2rem 1rem; align-items: baseline; margin: 0.8rem 1rem 0; padding: 0.6rem 0.9rem; background: #fff; border: 1px solid var(--operator); border-left-width: 4px; border-radius: 3px; animation: view-in 0.3s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
+.now-step { font-stretch: var(--narrow); font-weight: 700; color: var(--operator); white-space: nowrap; }
+.now-text { font-weight: 600; }
+.now-wait { display: block; font-weight: 400; color: var(--ink-2); font-size: 0.9375rem; margin-top: 0.15rem; }
+.now.is-waiting { border-color: var(--equip); }
+.now.is-waiting .now-step { color: var(--ink-2); }
+
+@media (prefers-reduced-motion: reduce) {
+  .guide, .mimic .guide-pulse, .tabs button.guide::after { animation: none !important; }
+  .mimic .guide-pulse { stroke-opacity: 1; transform: none; }
+}
+.now-go { display: block; font-weight: 600; color: var(--operator); font-size: 0.9375rem; margin-top: 0.15rem; }

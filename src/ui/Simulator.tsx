@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import type { Exercise } from '../sim/exercises'
+import { useEffect, useRef, useState } from 'react'
+import { advance, type Exercise } from '../sim/exercises'
 import { valveLabel, type SimState } from '../sim/engine'
 import type { TimedAction } from '../sim/worker'
 import { VLCC } from '../sim/ship'
@@ -8,6 +8,7 @@ import { LinesView } from './LinesView'
 import { TerminalView } from './TerminalView'
 import { TanksView } from './TanksView'
 import { clock } from './format'
+import { GButton, GuideContext, viewOf } from './guide'
 
 type View = 'lineas' | 'terminal' | 'tanques' | 'registro'
 const VIEWS: { id: View; label: string }[] = [
@@ -35,12 +36,12 @@ function ValvePanel({ id, s, act }: { id: string; s: SimState; act: (o: number) 
       <h3>{valveLabel(VLCC, id)}</h3>
       <p className="valve-state">{v === 0 ? 'Cerrada' : v === 1 ? 'Abierta' : `Abierta al ${Math.round(v * 100)}%`}</p>
       <div className="row">
-        <button onClick={() => act(1)} disabled={v === 1}>
+        <GButton id="panel:open" onClick={() => act(1)} disabled={v === 1}>
           Abrir
-        </button>
-        <button onClick={() => act(0)} disabled={v === 0}>
+        </GButton>
+        <GButton id="panel:close" onClick={() => act(0)} disabled={v === 0}>
           Cerrar
-        </button>
+        </GButton>
       </div>
       {throttle && (
         <div style={{ marginTop: '0.6rem' }}>
@@ -50,9 +51,9 @@ function ValvePanel({ id, s, act }: { id: string; s: SimState; act: (o: number) 
           <input id="throttle" type="range" min={0} max={100} step={5} value={pct} onChange={(e) => setPct(Number(e.target.value))} />
           <div className="row">
             {[25, 50, 75].map((p) => (
-              <button key={p} className="small" onClick={() => act(p / 100)}>
+              <GButton key={p} id={`panel:${p}`} className="small" onClick={() => act(p / 100)}>
                 {p}%
-              </button>
+              </GButton>
             ))}
             <span className="spacer" />
             <button className="small primary" onClick={() => act(pct / 100)}>
@@ -68,8 +69,9 @@ function ValvePanel({ id, s, act }: { id: string; s: SimState; act: (o: number) 
 export function Simulator({ exercise, hints, onFinish, onExit }: Props) {
   const { snap, act, setSpeed, setPaused } = useSim(exercise.id)
   const [view, setView] = useState<View>('lineas')
-  const [selected, setSelected] = useState<string | null>('MF1')
+  const [selected, setSelected] = useState<string | null>(null)
   const [confirm, setConfirm] = useState(false)
+  const progress = useRef(0)
 
   if (!snap) return <div className="home">Cargando simulador…</div>
   const s = snap.state
@@ -77,9 +79,23 @@ export function Simulator({ exercise, hints, onFinish, onExit }: Props) {
   const unacked = activeAlarms.filter((a) => !a.acked)
   const worst = unacked.some((a) => a.level === 'critica') ? 'critica' : 'alta'
   const steps = exercise.steps ?? []
-  const firstPending = steps.findIndex((st) => !st.done(s))
+  progress.current = advance(steps, s, progress.current)
+  const firstPending = progress.current < steps.length ? progress.current : -1
+  const allDone = steps.length > 0 && firstPending === -1
+
+  // Guía: qué controles resaltar en este momento
+  const g = !hints || steps.length === 0 ? null : allDone ? { targets: ['finish'] } : steps[firstPending].guide?.(s, { selected, factor: snap.factor }) ?? { targets: [] }
+  const guide = new Set<string>()
+  for (const t of g?.targets ?? []) {
+    const v = viewOf(t)
+    if (v && v !== view) guide.add(`tab:${v}`)
+    else if (!t.startsWith('view:')) guide.add(t)
+  }
+  // si lo que hay que tocar está en otra pestaña, decirlo con palabras
+  const goTab = VIEWS.find((v) => guide.has(`tab:${v.id}`) && (g?.targets ?? []).some((t) => viewOf(t) === v.id && !t.startsWith('view:')))
 
   return (
+    <GuideContext.Provider value={guide}>
     <div className="sim">
       <div className="topbar">
         <button className="small" onClick={onExit} title="Volver al menú sin guardar">
@@ -95,17 +111,17 @@ export function Simulator({ exercise, hints, onFinish, onExit }: Props) {
         </span>
         <div className="speed" role="group" aria-label="Velocidad de la simulación">
           {SPEEDS.map((f) => (
-            <button key={f} className={`small ${snap.factor === f ? 'on' : ''}`} aria-pressed={snap.factor === f} onClick={() => setSpeed(f)}>
+            <GButton key={f} id={`speed:${f}`} className={`small ${snap.factor === f ? 'on' : ''}`} aria-pressed={snap.factor === f} onClick={() => setSpeed(f)}>
               ×{f}
-            </button>
+            </GButton>
           ))}
         </div>
         <button className="small" onClick={() => setPaused(!snap.paused)}>
           {snap.paused ? 'Reanudar' : 'Pausa'}
         </button>
-        <button className="small primary" onClick={() => setConfirm(true)}>
+        <GButton id="finish" className="small primary" onClick={() => setConfirm(true)}>
           Finalizar
-        </button>
+        </GButton>
       </div>
 
       {unacked.length > 0 ? (
@@ -126,11 +142,21 @@ export function Simulator({ exercise, hints, onFinish, onExit }: Props) {
         <div className="main">
           <div className="tabs" role="tablist">
             {VIEWS.map((v) => (
-              <button key={v.id} role="tab" aria-selected={view === v.id} onClick={() => setView(v.id)}>
+              <button key={v.id} role="tab" aria-selected={view === v.id} className={guide.has(`tab:${v.id}`) ? 'guide' : undefined} onClick={() => setView(v.id)}>
                 {v.label}
               </button>
             ))}
           </div>
+          {g && (
+            <div className={`now ${g.targets.length === 0 || g.wait ? 'is-waiting' : ''}`} aria-live="polite">
+              <span className="now-step">{allDone ? 'Listo' : `Paso ${firstPending + 1} de ${steps.length}`}</span>
+              <span className="now-text">
+                {allDone ? 'Completaste todos los pasos. Tocá Finalizar para ver tu nota.' : steps[firstPending].text}
+                {goTab && <span className="now-go">Primero andá a la pestaña {goTab.label}.</span>}
+                {g.wait && <span className="now-wait">{g.wait}</span>}
+              </span>
+            </div>
+          )}
           <div className="view" key={view}>
             {view === 'lineas' && (
               <>
@@ -167,13 +193,20 @@ export function Simulator({ exercise, hints, onFinish, onExit }: Props) {
         </div>
 
         <aside className="side">
-          {selected && <ValvePanel id={selected} s={s} act={(o) => act({ type: 'valve', id: selected, opening: o })} />}
+          {selected ? (
+            <ValvePanel id={selected} s={s} act={(o) => act({ type: 'valve', id: selected, opening: o })} />
+          ) : (
+            <section>
+              <h3>Válvulas</h3>
+              <p className="quiet small-text">Tocá una válvula o un tanque en Líneas de carga para abrirla, cerrarla o estrangularla desde acá.</p>
+            </section>
+          )}
           {hints && steps.length > 0 && (
             <section>
               <h3>Pasos</h3>
               <ol className="steps">
                 {steps.map((st, i) => {
-                  const done = st.done(s)
+                  const done = firstPending === -1 || i < firstPending
                   const cls = done ? 'done' : i === firstPending ? 'current' : ''
                   return (
                     <li key={i} className={cls}>
@@ -188,14 +221,6 @@ export function Simulator({ exercise, hints, onFinish, onExit }: Props) {
                       </span>
                       <span>
                         {st.text}
-                        {i === firstPending && st.view && st.view !== view && (
-                          <>
-                            {' '}
-                            <button className="small" onClick={() => setView(st.view!)}>
-                              Ir a {VIEWS.find((v) => v.id === st.view)?.label}
-                            </button>
-                          </>
-                        )}
                       </span>
                     </li>
                   )
@@ -252,5 +277,6 @@ export function Simulator({ exercise, hints, onFinish, onExit }: Props) {
         </div>
       )}
     </div>
+    </GuideContext.Provider>
   )
 }
