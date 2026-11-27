@@ -329,19 +329,10 @@ button.guide:not(.primary):not(.on) { background: #fff; border-color: var(--oper
 rect.guide-pulse { animation-name: guide-svg-rect; }
 @keyframes guide-svg-rect { 0% { stroke-opacity: 1; } 70% { stroke-opacity: 0.15; } 100% { stroke-opacity: 1; } }
 
-/* Franja "Ahora": el paso actual en una línea, arriba del mímico */
-.now { display: grid; grid-template-columns: auto 1fr; gap: 0.2rem 1rem; align-items: baseline; margin: 0.8rem 1rem 0; padding: 0.6rem 0.9rem; background: #fff; border: 1px solid var(--operator); border-left-width: 4px; border-radius: 3px; animation: view-in 0.3s cubic-bezier(0.2, 0.7, 0.2, 1) both; }
-.now-step { font-stretch: var(--narrow); font-weight: 700; color: var(--operator); white-space: nowrap; }
-.now-text { font-weight: 600; }
-.now-wait { display: block; font-weight: 400; color: var(--ink-2); font-size: 0.9375rem; margin-top: 0.15rem; }
-.now.is-waiting { border-color: var(--equip); }
-.now.is-waiting .now-step { color: var(--ink-2); }
-
 @media (prefers-reduced-motion: reduce) {
   .guide, .mimic .guide-pulse, .tabs button.guide::after { animation: none !important; }
   .mimic .guide-pulse { stroke-opacity: 1; transform: none; }
 }
-.now-go { display: block; font-weight: 600; color: var(--operator); font-size: 0.9375rem; margin-top: 0.15rem; }
 
 /* ---------- Popup de válvula ---------- */
 /* Sale de la válvula tocada; la flecha apunta a ella. */
@@ -379,3 +370,56 @@ rect.guide-pulse { animation-name: guide-svg-rect; }
 .pop-range input { flex: 1; min-width: 0; }
 .pop-range button { white-space: nowrap; }
 @media (prefers-reduced-motion: reduce) { .valve-pop { animation: none; } }
+
+/* ---------- Capitán guía ---------- */
+/* Se desliza hasta el control que hay que tocar; el globo nunca tapa ese control. */
+.captain {
+  position: fixed; left: 0; top: 0; z-index: 30; width: 60px; height: 60px;
+  transition: transform 0.7s cubic-bezier(0.25, 0.9, 0.3, 1.08);
+  pointer-events: none;
+}
+.captain.dragging { transition: none; }
+.captain-face {
+  pointer-events: auto; position: relative; width: 60px; height: 60px; padding: 0; border-radius: 50%;
+  border: 3px solid var(--operator); background: #fff; overflow: hidden; cursor: grab; touch-action: none;
+  box-shadow: 0 6px 18px rgba(29, 35, 39, 0.28);
+}
+.captain-face:hover:not(:disabled) { background: #fff; border-color: var(--operator); }
+.captain-face svg { display: block; }
+.captain.dragging .captain-face { cursor: grabbing; scale: 1.08; box-shadow: 0 12px 28px rgba(29, 35, 39, 0.35); }
+.captain.resting .captain-face { animation: captain-bob 2.6s ease-in-out infinite; }
+.captain.pinned .captain-face { border-style: dashed; }
+@keyframes captain-bob { 50% { translate: 0 -4px; } }
+
+.captain-bubble {
+  pointer-events: auto; position: absolute; display: flex; flex-direction: column; gap: 0.2rem;
+  padding: 0.65rem 0.85rem 0.75rem; background: #fff; color: var(--ink);
+  border: 1.5px solid var(--operator); border-radius: 14px;
+  box-shadow: 0 10px 26px rgba(29, 35, 39, 0.2);
+  animation: bubble-in 0.3s cubic-bezier(0.2, 0.9, 0.3, 1.15) both;
+}
+.captain.right .captain-bubble { left: 72px; transform-origin: 0 0; }
+.captain.left .captain-bubble { right: 72px; transform-origin: 100% 0; }
+.captain.below .captain-bubble { top: 0; }
+.captain.above .captain-bubble { bottom: 0; }
+.captain.above.right .captain-bubble { transform-origin: 0 100%; }
+.captain.above.left .captain-bubble { transform-origin: 100% 100%; }
+/* colita del globo hacia el capitán */
+.captain-bubble::before {
+  content: ''; position: absolute; width: 12px; height: 12px; background: #fff;
+  border: 1.5px solid var(--operator); rotate: 45deg;
+}
+.captain.right .captain-bubble::before { left: -7px; border-top: none; border-right: none; }
+.captain.left .captain-bubble::before { right: -7px; border-bottom: none; border-left: none; }
+.captain.below .captain-bubble::before { top: 22px; }
+.captain.above .captain-bubble::before { bottom: 22px; }
+@keyframes bubble-in { from { opacity: 0; scale: 0.8; } }
+.captain-step { font-stretch: var(--narrow); font-weight: 700; color: var(--operator); font-size: 0.875rem; }
+.captain-text { font-weight: 600; line-height: 1.35; }
+.captain-go { font-weight: 650; color: var(--operator); font-size: 0.9375rem; }
+.captain-wait { color: var(--ink-2); font-size: 0.9375rem; }
+.captain-follow { align-self: flex-start; margin-top: 0.35rem; }
+@media (prefers-reduced-motion: reduce) {
+  .captain { transition: none; }
+  .captain.resting .captain-face { animation: none; }
+}

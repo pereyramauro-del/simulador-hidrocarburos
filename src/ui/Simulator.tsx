@@ -8,6 +8,7 @@ import { TerminalView } from './TerminalView'
 import { TanksView } from './TanksView'
 import { clock } from './format'
 import { GButton, GuideContext, viewOf } from './guide'
+import { Captain } from './Captain'
 
 type View = 'lineas' | 'terminal' | 'tanques' | 'registro'
 const VIEWS: { id: View; label: string }[] = [
@@ -109,16 +110,6 @@ export function Simulator({ exercise, hints, onFinish, onExit }: Props) {
               </button>
             ))}
           </div>
-          {g && (
-            <div className={`now ${g.targets.length === 0 || g.wait ? 'is-waiting' : ''}`} aria-live="polite">
-              <span className="now-step">{allDone ? 'Listo' : `Paso ${firstPending + 1} de ${steps.length}`}</span>
-              <span className="now-text">
-                {allDone ? 'Completaste todos los pasos. Tocá Finalizar para ver tu nota.' : steps[firstPending].text}
-                {goTab && <span className="now-go">Primero andá a la pestaña {goTab.label}.</span>}
-                {g.wait && <span className="now-wait">{g.wait}</span>}
-              </span>
-            </div>
-          )}
           <div className="view" key={view}>
             {view === 'lineas' && (
               <>
@@ -215,6 +206,16 @@ export function Simulator({ exercise, hints, onFinish, onExit }: Props) {
           )}
         </aside>
       </div>
+
+      {g && (
+        <Captain
+          stepKey={allDone ? 'fin' : String(firstPending)}
+          label={allDone ? 'Listo' : `Paso ${firstPending + 1} de ${steps.length}`}
+          text={allDone ? 'Completaste todos los pasos. Tocá Finalizar para ver tu nota.' : steps[firstPending].text}
+          go={goTab ? `Primero andá a la pestaña ${goTab.label}.` : undefined}
+          wait={g.wait}
+        />
+      )}
 
       {confirm && (
         <div className="modal-back" onClick={() => setConfirm(false)}>
