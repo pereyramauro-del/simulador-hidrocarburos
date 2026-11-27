@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import type { Exercise } from '../sim/exercises'
 import type { SimState } from '../sim/engine'
 import { fillOf } from '../sim/engine'
@@ -14,6 +14,24 @@ interface Props {
   hints: boolean
   onMenu: () => void
   onRetry: () => void
+}
+
+/** La nota cuenta hasta su valor una vez (salvo con movimiento reducido). */
+function useCountUp(target: number) {
+  const [v, setV] = useState(() => (matchMedia('(prefers-reduced-motion: reduce)').matches ? target : 0))
+  useEffect(() => {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return setV(target)
+    let raf = 0
+    const t0 = performance.now()
+    const tick = (now: number) => {
+      const k = Math.min(1, (now - t0) / 900)
+      setV(Math.round(target * (1 - Math.pow(1 - k, 3))))
+      if (k < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [target])
+  return v
 }
 
 export function Result({ exercise, state: s, actions, hints, onMenu, onRetry }: Props) {
@@ -50,44 +68,55 @@ export function Result({ exercise, state: s, actions, hints, onMenu, onRetry }: 
     download(`sesion-${exercise.id}-${safe}-${date.slice(0, 10)}.json`, JSON.stringify({ ...body, hash }, null, 2))
   }
 
+  const shown = useCountUp(evaluation?.score ?? 0)
+
   return (
-    <div className="result">
+    <main className="result">
       <div className="row no-print" style={{ marginBottom: '1rem' }}>
-        <button onClick={onMenu}>← Menú</button>
+        <button onClick={onMenu}>Menú</button>
         <button onClick={onRetry}>Repetir ejercicio</button>
         <span className="spacer" />
         <button onClick={exportSession}>Descargar sesión (.json)</button>
         <button className="primary" onClick={() => window.print()}>
-          Imprimir / guardar PDF
+          Imprimir o guardar PDF
         </button>
       </div>
 
-      <div className="card">
-        <span className="muted">
-          Informe de ejercicio · Simulador de carga de hidrocarburos (prototipo)
-        </span>
-        <h1>{exercise.number ? `Ejercicio ${exercise.number}: ` : ''}{exercise.title}</h1>
-        <div className="kv" style={{ maxWidth: 520, marginBottom: '1rem' }}>
-          <span>Alumno</span>
-          <span>{alumno || '—'}</span>
-          <span>Fecha</span>
-          <span>{new Date(date).toLocaleString('es-AR')}</span>
-          <span>Tiempo simulado</span>
-          <span>{clock(s.t)}</span>
-          <span>Modo</span>
-          <span>{hints ? 'Con pasos guiados' : 'Sin guía'}</span>
-        </div>
+      <article className="report">
+        <header className="report-head">
+          <div>
+            <p className="kind">Informe de práctica, simulador de carga de hidrocarburos</p>
+            <h1>
+              {exercise.number ? `Ejercicio ${exercise.number}: ` : ''}
+              {exercise.title}
+            </h1>
+          </div>
+          <dl className="kv" style={{ minWidth: 260, margin: 0 }}>
+            <dt>Alumno</dt>
+            <dd>{alumno || 'Sin nombre'}</dd>
+            <dt>Fecha</dt>
+            <dd>{new Date(date).toLocaleString('es-AR', { dateStyle: 'short', timeStyle: 'short' })}</dd>
+            <dt>Tiempo simulado</dt>
+            <dd>{clock(s.t)}</dd>
+            <dt>Modo</dt>
+            <dd>{hints ? 'Con pasos guiados' : 'Sin guía'}</dd>
+          </dl>
+        </header>
 
         {evaluation && (
-          <div className="row" style={{ alignItems: 'baseline', marginBottom: '1rem' }}>
-            <span className="score">{evaluation.score}</span>
-            <span className="muted">/ 100</span>
-            <span className={`tag ${evaluation.passed ? 'ok' : 'bad'}`}>{evaluation.passed ? 'Aprobado' : 'No aprobado'} (mínimo 70)</span>
+          <div className="score-line">
+            <span className="score" aria-label={`Nota ${evaluation.score} sobre 100`}>
+              {shown}
+            </span>
+            <span className="quiet">sobre 100</span>
+            <span className={`grade ${evaluation.passed ? 'pass' : 'fail'}`} style={{ marginLeft: '0.6rem' }}>
+              {evaluation.passed ? 'Aprobado' : 'No aprobado'}, el mínimo es 70
+            </span>
           </div>
         )}
 
         {evaluation && (
-          <table className="data" style={{ marginBottom: '1rem' }}>
+          <table className="data" style={{ marginBottom: '1.6rem' }}>
             <thead>
               <tr>
                 <th>Criterio</th>
@@ -97,13 +126,16 @@ export function Result({ exercise, state: s, actions, hints, onMenu, onRetry }: 
               </tr>
             </thead>
             <tbody>
-              {evaluation.items.map((i) => (
-                <tr key={i.id}>
+              {evaluation.items.map((i, k) => (
+                <tr key={i.id} className="eval-row" style={{ '--i': k } as CSSProperties}>
                   <td>
-                    <span className={`tag ${i.ok ? 'ok' : 'bad'}`}>{i.ok ? '✓' : '✗'}</span> {i.rule}
+                    <span className={`check ${i.ok ? 'ok' : 'bad'}`} aria-label={i.ok ? 'Cumplido' : 'No cumplido'}>
+                      {i.ok ? '✓' : '✗'}
+                    </span>
+                    {i.rule}
                   </td>
                   <td style={{ textAlign: 'left' }}>{i.detail}</td>
-                  <td className="mono">{i.t !== undefined ? clock(i.t) : ''}</td>
+                  <td>{i.t !== undefined ? clock(i.t) : ''}</td>
                   <td>{i.penalty ? `−${i.penalty}` : ''}</td>
                 </tr>
               ))}
@@ -112,7 +144,7 @@ export function Result({ exercise, state: s, actions, hints, onMenu, onRetry }: 
         )}
 
         <h2>Estado final del buque</h2>
-        <div className="grid2">
+        <div className="panels">
           <table className="data">
             <thead>
               <tr>
@@ -125,7 +157,7 @@ export function Result({ exercise, state: s, actions, hints, onMenu, onRetry }: 
             <tbody>
               {cargoTanks.length === 0 && (
                 <tr>
-                  <td colSpan={4} className="muted">
+                  <td colSpan={4} className="quiet">
                     Sin carga a bordo.
                   </td>
                 </tr>
@@ -140,32 +172,32 @@ export function Result({ exercise, state: s, actions, hints, onMenu, onRetry }: 
               ))}
             </tbody>
           </table>
-          <div className="kv">
-            <span>Calado popa / proa</span>
-            <span>
-              {fmt2(s.hydro.draftAft)} / {fmt2(s.hydro.draftFwd)} m
-            </span>
-            <span>Escora</span>
-            <span>{fmt2(s.hydro.heelDeg)}°</span>
-            <span>GM corregido</span>
-            <span>{fmt2(s.hydro.gmCorrected)} m</span>
-            <span>Carga derramada</span>
-            <span>{fmt0(s.spilled)} m³</span>
+          <dl className="kv" style={{ margin: 0 }}>
+            <dt>Calado de popa y de proa</dt>
+            <dd>
+              {fmt2(s.hydro.draftAft)} y {fmt2(s.hydro.draftFwd)} m
+            </dd>
+            <dt>Escora</dt>
+            <dd>{fmt2(s.hydro.heelDeg)}°</dd>
+            <dt>GM corregido</dt>
+            <dd>{fmt2(s.hydro.gmCorrected)} m</dd>
+            <dt>Carga derramada</dt>
+            <dd>{fmt0(s.spilled)} m³</dd>
             {exercise.id === 'ex3' && (
               <>
-                <span>Llenado de CT1</span>
-                <span>{fmt1(fillOf(VLCC, s, 'CT1') * 100)}%</span>
+                <dt>Llenado de CT1</dt>
+                <dd>{fmt1(fillOf(VLCC, s, 'CT1') * 100)}%</dd>
               </>
             )}
-          </div>
+          </dl>
         </div>
-        <p className="muted print-only" style={{ fontSize: '0.8rem', marginTop: '1rem' }}>
-          Nota de práctica calculada en el equipo del alumno. Herramienta no homologada; valores didácticos aproximados.
-        </p>
-      </div>
-      <p className="muted no-print" style={{ fontSize: '0.85rem', marginTop: '0.8rem' }}>
-        Para entregar al instructor: guardá el informe como PDF con “Imprimir / guardar PDF” y adjuntá también la sesión (.json), que incluye el registro completo de tus acciones y una huella de integridad.
-      </p>
-    </div>
+        <p className="note print-only">Nota de práctica calculada en la computadora del alumno. Herramienta no homologada; valores didácticos aproximados.</p>
+        <div className="signature">
+          <div>Firma del alumno</div>
+          <div>Firma del instructor</div>
+        </div>
+      </article>
+      <p className="note no-print">Para entregar al instructor: guardá el informe como PDF con "Imprimir o guardar PDF" y adjuntá la sesión (.json), que tiene el registro completo de tus acciones y una huella de integridad.</p>
+    </main>
   )
 }

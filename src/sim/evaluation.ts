@@ -25,7 +25,7 @@ const PASS = 70
 const firstEvent = (s: SimState, type: string, pred?: (d: Record<string, unknown>) => boolean) =>
   s.events.find((e) => e.type === type && (!pred || pred(e.data ?? {})))
 
-const pct = (x: number) => `${(x * 100).toFixed(1)}%`
+const pct = (x: number) => `${(x * 100).toLocaleString('es-AR', { minimumFractionDigits: 1, maximumFractionDigits: 1 })}%`
 const hms = (t: number) => {
   const h = Math.floor(t / 3600)
   const m = Math.floor((t % 3600) / 60)

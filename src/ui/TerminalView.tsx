@@ -6,8 +6,8 @@ import { clock, fmt0, fmt1 } from './format'
 
 const STATE_TEXT: Record<TerminalState, string> = {
   sin_manguera: 'Esperando conexión de manguera',
-  esperando: 'Manguera conectada · esperando aviso del buque',
-  autorizado: 'Autorizado · esperando pedido de inicio',
+  esperando: 'Manguera conectada, espera el aviso del buque',
+  autorizado: 'Autorizado, espera el pedido de inicio',
   bombeando: 'Bombeando',
   parando: 'Parando bombas',
   detenido: 'Bombeo detenido',
@@ -24,31 +24,36 @@ export function TerminalView({ s, act }: { s: SimState; act: (a: Action) => void
     chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight })
   }, [msgs.length])
 
-  const pColor = s.manifoldPressure >= P_HIGH ? 'var(--crit)' : s.manifoldPressure >= P_HIGH * 0.75 ? 'var(--warn)' : 'var(--ok)'
+  // color solo cuando la presión se acerca a la alarma
+  const pColor = s.manifoldPressure >= P_HIGH ? 'var(--alarm-crit)' : s.manifoldPressure >= P_HIGH * 0.75 ? 'var(--alarm-high)' : 'var(--ink)'
 
   return (
-    <div className="grid2">
-      <div className="card">
+    <div className="panels">
+      <div className="panel">
         <h2>Terminal de carga</h2>
-        <div className="kv">
-          <span>Estado</span>
-          <span style={{ color: term.state === 'esd' ? 'var(--crit)' : undefined }}>{STATE_TEXT[term.state]}</span>
-          <span>Producto</span>
-          <span>
-            {term.product} · {fmt0(term.density * 1000)} kg/m³ a 15 °C
-          </span>
-          <span>Caudal actual</span>
-          <span>{fmt0(term.rate)} m³/h</span>
-          <span>Caudal pedido</span>
-          <span>{fmt0(term.target)} m³/h</span>
-          <span>Presión en el manifold</span>
-          <span style={{ color: pColor }}>{fmt1(s.manifoldPressure)} bar</span>
-          <span className="muted">Alarma / parada de emergencia</span>
-          <span className="muted">
-            {P_HIGH} / {P_ESD} bar
-          </span>
+        <dl className="kv">
+          <dt>Estado</dt>
+          <dd style={{ color: term.state === 'esd' ? 'var(--alarm-crit)' : undefined, fontWeight: 650 }}>{STATE_TEXT[term.state]}</dd>
+          <dt>Producto</dt>
+          <dd>
+            {term.product}, {fmt0(term.density * 1000)} kg/m³ a 15 °C
+          </dd>
+          <dt>Caudal actual</dt>
+          <dd>{fmt0(term.rate)} m³/h</dd>
+          <dt>Caudal pedido</dt>
+          <dd>{fmt0(term.target)} m³/h</dd>
+          <dt>Presión en el manifold</dt>
+          <dd style={{ color: pColor, fontWeight: 650 }}>{fmt1(s.manifoldPressure)} bar</dd>
+          <dt>Alarma y parada de emergencia</dt>
+          <dd className="quiet">
+            {P_HIGH} y {P_ESD} bar
+          </dd>
+        </dl>
+        <div className="bar" aria-hidden="true" style={{ marginTop: '0.8rem', height: 8, background: 'var(--bulkhead)', borderRadius: 2, position: 'relative', overflow: 'hidden' }}>
+          <div className="bar-fill" style={{ width: `${Math.min(100, (s.manifoldPressure / P_ESD) * 100)}%`, height: '100%', background: pColor }} />
+          <div style={{ position: 'absolute', top: 0, bottom: 0, left: `${(P_HIGH / P_ESD) * 100}%`, width: 2, background: 'var(--ink)' }} />
         </div>
-        <h3 style={{ marginTop: '1rem' }}>Mangueras en el manifold</h3>
+        <h3 style={{ marginTop: '1.2rem' }}>Mangueras en el manifold</h3>
         <div className="row">
           {VLCC.lines.map((l) => {
             const avail = s.availableHoses.includes(l.id)
@@ -56,23 +61,23 @@ export function TerminalView({ s, act }: { s: SimState; act: (a: Action) => void
             return (
               <button
                 key={l.id}
-                className={on ? 'active' : undefined}
+                className={on ? 'on' : undefined}
+                aria-pressed={on}
                 disabled={!avail}
                 title={avail ? undefined : 'La terminal no tiene manguera para esta línea en este ejercicio'}
                 onClick={() => act({ type: 'hose', line: l.id, connected: !on })}
-                style={{ borderColor: avail ? l.color : undefined }}
               >
-                L{l.id}: {on ? 'conectada' : avail ? 'conectar' : 'no disponible'}
+                {on ? `Desconectar L${l.id}` : avail ? `Conectar L${l.id}` : `L${l.id} sin manguera`}
               </button>
             )
           })}
         </div>
       </div>
 
-      <div className="card">
-        <h2>Comunicaciones buque–terminal</h2>
+      <div className="panel">
+        <h2>Comunicaciones con la terminal</h2>
         <div className="row" style={{ marginBottom: '0.6rem' }}>
-          <button onClick={() => act({ type: 'msg', kind: 'listo' })}>Buque listo para recibir</button>
+          <button onClick={() => act({ type: 'msg', kind: 'listo' })}>Avisar: buque listo</button>
         </div>
         <div className="row" style={{ marginBottom: '0.6rem' }}>
           <label className="row">
@@ -80,24 +85,22 @@ export function TerminalView({ s, act }: { s: SimState; act: (a: Action) => void
             <input type="number" min={0} max={term.maxRate} step={500} value={rate} onChange={(e) => setRate(Number(e.target.value))} style={{ width: '7.5em' }} />
             m³/h
           </label>
-          <button onClick={() => act({ type: 'msg', kind: 'iniciar', rate })}>Iniciar bombeo</button>
-          <button onClick={() => act({ type: 'msg', kind: 'caudal', rate })}>Cambiar caudal</button>
+          <button onClick={() => act({ type: 'msg', kind: 'iniciar', rate })}>Pedir inicio</button>
+          <button onClick={() => act({ type: 'msg', kind: 'caudal', rate })}>Pedir cambio de caudal</button>
         </div>
-        <div className="row" style={{ marginBottom: '0.8rem' }}>
-          <button onClick={() => act({ type: 'msg', kind: 'ultimo' })}>Aviso: último tanque</button>
+        <div className="row">
+          <button onClick={() => act({ type: 'msg', kind: 'ultimo' })}>Avisar: último tanque</button>
           <button className="danger" onClick={() => act({ type: 'msg', kind: 'parar' })}>
-            Parar bombeo
+            Pedir parada
           </button>
         </div>
-        <div className="chat" ref={chatRef}>
-          {msgs.length === 0 && <span className="muted">Sin mensajes todavía.</span>}
+        <div className="radio-log" ref={chatRef} aria-live="polite">
+          {msgs.length === 0 && <p className="quiet small-text" style={{ padding: '0.4rem 0' }}>Todavía no hubo comunicaciones.</p>}
           {msgs.map((m, i) => (
-            <div key={i} className={`msg ${m.who}`}>
-              <span className="muted mono" style={{ fontSize: '0.75rem' }}>
-                {clock(m.t)} · {m.who === 'alumno' ? 'Buque' : m.who === 'terminal' ? 'Terminal' : 'Sistema'}
-              </span>
-              <br />
-              {m.text}
+            <div key={i} className={m.who}>
+              <span className="when">{clock(m.t)}</span>
+              <span className="who">{m.who === 'alumno' ? 'Buque' : m.who === 'terminal' ? 'Terminal' : 'Sistema'}</span>
+              <span>{m.text}</span>
             </div>
           ))}
         </div>

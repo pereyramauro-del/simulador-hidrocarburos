@@ -1,6 +1,20 @@
 import { useRef, useState } from 'react'
 import { EXERCISES, type Exercise } from '../sim/exercises'
+import { VLCC } from '../sim/ship'
 import { exportBackup, importBackup, loadName, loadResults, saveName } from '../storage'
+import { HULL_BOTTOM, ShipPlan } from './ShipPlan'
+
+// Bloques del Curso Modelo OMI 2.06 con sus horas sugeridas
+const BLOCKS = [
+  { n: 1, title: 'Familiarización', hours: 6 },
+  { n: 2, title: 'Operaciones y procedimientos especiales', hours: 10 },
+  { n: 3, title: 'Operaciones de lastre', hours: 4 },
+  { n: 4, title: 'Operaciones de carga', hours: 6 },
+  { n: 5, title: 'Problemas operacionales', hours: 4 },
+]
+
+// Portada: el buque cargado al 98% en todos los tanques de carga
+const HERO_FILLS = VLCC.tanks.map((t) => (t.kind === 'ballast' ? 0 : 0.98))
 
 export function Home({ onStart, offlineReady }: { onStart: (ex: Exercise, hints: boolean) => void; offlineReady: boolean }) {
   const [name, setName] = useState(loadName())
@@ -13,24 +27,49 @@ export function Home({ onStart, offlineReady }: { onStart: (ex: Exercise, hints:
     const r = results.filter((x) => x.exerciseId === id)
     return r.length ? Math.max(...r.map((x) => x.score)) : null
   }
+  const free = EXERCISES.find((e) => e.block === 0)!
+
+  const Row = ({ ex }: { ex: Exercise }) => {
+    const b = best(ex.id)
+    return (
+      <div className={`ex-row ${ex.available ? '' : 'soon'}`}>
+        <span className="ex-num">{ex.number}</span>
+        <span className="ex-title">{ex.title}</span>
+        <span className="ex-sum">{ex.summary}</span>
+        <span className="ex-act">
+          {b !== null && <span className={`grade ${b >= 70 ? 'pass' : 'fail'}`}>Mejor nota {b}</span>}
+          {ex.available ? (
+            <button className="primary" onClick={() => setBriefing(ex)}>
+              Empezar
+            </button>
+          ) : (
+            <span className="ex-soon">Próximamente</span>
+          )}
+        </span>
+      </div>
+    )
+  }
 
   return (
-    <div className="home">
-      <header>
-        <div>
-          <h1>Simulador de carga de hidrocarburos</h1>
-          <p className="muted" style={{ margin: 0 }}>
-            Práctica de operaciones de carga de buque tanque · Curso de carga de hidrocarburos · Prototipo
-          </p>
-        </div>
+    <main className="home">
+      <div className="home-head">
+        <h1>Simulador de carga de hidrocarburos</h1>
         <span className="spacer" />
-        <span className={`tag ${offlineReady ? 'ok' : ''}`} title="La aplicación queda guardada en este navegador y abre sin internet">
-          {offlineReady ? '● Disponible sin conexión' : '○ Preparando uso sin conexión…'}
+        <span className={`status ${offlineReady ? 'ready' : ''}`} title="La aplicación queda guardada en este navegador y abre sin internet">
+          {offlineReady ? 'Disponible sin conexión' : 'Preparando uso sin conexión'}
         </span>
-      </header>
+      </div>
+      <p className="home-lede">Practicá la carga de un petrolero VLCC desde la sala de control: alineá las líneas, coordiná con la terminal y llená los tanques sin pasarte del 98%.</p>
 
-      <div className="card row" style={{ marginBottom: '1rem' }}>
-        <label className="row">
+      <div className="hero-plan">
+        <svg className="mimic" viewBox={`62 24 912 ${HULL_BOTTOM - 4}`} role="img" aria-label="Plano de tanques del VLCC de referencia, con los tanques de carga llenos">
+          <ShipPlan fills={HERO_FILLS} intro compact />
+        </svg>
+      </div>
+      <p className="hero-caption">El buque de los ejercicios: 4 tanques centrales, 5 pares laterales con los slops, lastre segregado y 4 líneas de carga.</p>
+
+      <div className="student">
+        <label>
           Alumno
           <input
             type="text"
@@ -40,19 +79,18 @@ export function Home({ onStart, offlineReady }: { onStart: (ex: Exercise, hints:
               setName(e.target.value)
               saveName(e.target.value)
             }}
-            style={{ minWidth: '16em' }}
           />
         </label>
-        <span className="muted" style={{ fontSize: '0.85rem' }}>
-          Aparece en los informes que entregás al instructor. Se guarda solo en este equipo.
-        </span>
+        <span className="quiet small-text">Figura en los informes que entregás. Se guarda solo en esta computadora.</span>
         <span className="spacer" />
-        <button className="small" onClick={exportBackup}>
-          Respaldar progreso
-        </button>
-        <button className="small" onClick={() => fileRef.current?.click()}>
-          Restaurar respaldo
-        </button>
+        <span className="row" style={{ gap: '0.5rem' }}>
+          <button className="small" onClick={exportBackup}>
+            Respaldar progreso
+          </button>
+          <button className="small" onClick={() => fileRef.current?.click()}>
+            Restaurar respaldo
+          </button>
+        </span>
         <input
           ref={fileRef}
           type="file"
@@ -66,48 +104,63 @@ export function Home({ onStart, offlineReady }: { onStart: (ex: Exercise, hints:
               setMsg(`Respaldo restaurado: ${n} resultado(s) nuevo(s).`)
               setName(loadName())
             } catch {
-              setMsg('No se pudo leer el archivo de respaldo.')
+              setMsg('Ese archivo no es un respaldo del simulador. Elegí el .json que descargaste con "Respaldar progreso".')
             }
             e.target.value = ''
           }}
         />
       </div>
-      {msg && <p className="tag ok">{msg}</p>}
+      {msg && <p className="small-text">{msg}</p>}
 
-      <div className="ex-list">
-        {EXERCISES.map((ex) => {
-          const b = best(ex.id)
+      <section className="syllabus" aria-labelledby="programa">
+        <h2 id="programa">Programa</h2>
+        <p>Ordenado según los bloques del Curso Modelo OMI 2.06. Las horas son las que sugiere el curso para cada bloque.</p>
+        {BLOCKS.map((b) => {
+          const exs = EXERCISES.filter((e) => e.block === b.n).sort((x, y) => (x.number ?? 0) - (y.number ?? 0))
           return (
-            <div key={ex.id} className={`card ex-card ${ex.available ? '' : 'off'}`}>
-              <span className="num">
-                {ex.number ? `Ejercicio ${ex.number}` : 'Práctica'} · {ex.block}
+            <div key={b.n} className="block">
+              <span className="block-num" aria-hidden="true">
+                {b.n}
               </span>
-              <h3>{ex.title}</h3>
-              <span className="summary">{ex.summary}</span>
-              <div className="row">
-                {ex.available ? (
-                  <button className="primary" onClick={() => setBriefing(ex)}>
-                    Empezar
-                  </button>
+              <div>
+                <div className="block-head">
+                  <h3>{b.title}</h3>
+                  <span className="hours">{b.hours} h</span>
+                </div>
+                {exs.length > 0 ? (
+                  exs.map((ex) => <Row key={ex.id} ex={ex} />)
                 ) : (
-                  <span className="tag">Próximamente</span>
+                  <p className="quiet small-text">Sin ejercicio propio: los fallos y averías aparecen dentro de los ejercicios de los otros bloques.</p>
                 )}
-                {b !== null && <span className={`tag ${b >= 70 ? 'ok' : 'bad'}`}>Mejor nota: {b}</span>}
               </div>
             </div>
           )
         })}
-      </div>
+        <div className="free-practice">
+          <span />
+          <div className="ex-row" style={{ gridTemplateColumns: '1fr auto' }}>
+            <span className="ex-title">{free.title}</span>
+            <span className="ex-sum" style={{ gridColumn: 1 }}>
+              {free.summary}
+            </span>
+            <span className="ex-act" style={{ gridColumn: 2 }}>
+              <button className="primary" onClick={() => setBriefing(free)}>
+                Empezar
+              </button>
+            </span>
+          </div>
+        </div>
+      </section>
 
       <p className="disclaimer">
-        Herramienta de práctica, no homologada bajo STCW A-I/12. El buque se basa en el VLCC del simulador Kongsberg VLCC-II descrito en un trabajo de la Universidad de La Laguna; la hidrostática y la hidráulica son aproximaciones didácticas. No usar estos valores para operaciones reales.
+        Herramienta de práctica, no homologada bajo STCW A-I/12. El buque se basa en el VLCC del simulador Kongsberg VLCC-II descrito en un trabajo de la Universidad de La Laguna. La hidrostática y la hidráulica son aproximaciones didácticas: no usar estos valores para operaciones reales.
       </p>
 
       {briefing && (
         <div className="modal-back" onClick={() => setBriefing(null)}>
-          <div className="card modal" onClick={(e) => e.stopPropagation()}>
-            <span className="muted">{briefing.number ? `Ejercicio ${briefing.number}` : 'Práctica'} · Briefing</span>
-            <h2>{briefing.title}</h2>
+          <div className="modal" role="dialog" aria-modal="true" aria-labelledby="briefing-title" onClick={(e) => e.stopPropagation()}>
+            <p className="context">{briefing.number ? `Ejercicio ${briefing.number}, briefing` : 'Briefing'}</p>
+            <h2 id="briefing-title">{briefing.title}</h2>
             {briefing.briefing?.map((p, i) => (
               <p key={i}>{p}</p>
             ))}
@@ -122,20 +175,20 @@ export function Home({ onStart, offlineReady }: { onStart: (ex: Exercise, hints:
               </>
             )}
             {briefing.steps && (
-              <label className="row" style={{ marginBottom: '1rem' }}>
+              <label className="row" style={{ marginBottom: '1.2rem' }}>
                 <input type="checkbox" checked={hints} onChange={(e) => setHints(e.target.checked)} />
                 Mostrar los pasos como guía (la nota se calcula igual)
               </label>
             )}
             <div className="row">
               <button className="primary" onClick={() => onStart(briefing, hints)}>
-                Comenzar
+                Comenzar ejercicio
               </button>
               <button onClick={() => setBriefing(null)}>Cancelar</button>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </main>
   )
 }

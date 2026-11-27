@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { flushSync } from 'react-dom'
 import type { Exercise } from './sim/exercises'
 import type { SimState } from './sim/engine'
 import type { TimedAction } from './sim/worker'
@@ -12,7 +13,14 @@ type Screen =
   | { kind: 'result'; ex: Exercise; hints: boolean; state: SimState; actions: TimedAction[] }
 
 export default function App({ offlineReady }: { offlineReady: boolean }) {
-  const [screen, setScreen] = useState<Screen>({ kind: 'home' })
+  const [screen, setScreenNow] = useState<Screen>({ kind: 'home' })
+  // Cambio de pantalla con View Transitions cuando el navegador lo soporta
+  const setScreen = (next: Screen) => {
+    const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches
+    if (!document.startViewTransition || reduce) return setScreenNow(next)
+    document.startViewTransition(() => flushSync(() => setScreenNow(next)))
+    window.scrollTo(0, 0)
+  }
 
   if (screen.kind === 'sim')
     return (

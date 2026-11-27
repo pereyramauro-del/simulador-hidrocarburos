@@ -15,8 +15,8 @@ export default defineConfig({
         short_name: 'Simulador carga',
         description: 'Práctica de operaciones de carga de buque tanque, disponible sin conexión.',
         lang: 'es-AR',
-        theme_color: '#0f1720',
-        background_color: '#0f1720',
+        theme_color: '#e9ebec',
+        background_color: '#e9ebec',
         display: 'standalone',
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
@@ -25,7 +25,7 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
+        globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest,woff2}'],
       },
     }),
   ],

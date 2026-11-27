@@ -17,7 +17,8 @@ export interface Exercise {
   id: string
   number: number | null
   title: string
-  block: string
+  /** Bloque del Curso Modelo OMI 2.06 (1–5); 0 = práctica libre */
+  block: number
   available: boolean
   evaluated: boolean
   summary: string
@@ -55,13 +56,13 @@ const freeInitial = (): InitialCondition => ({
 const sent = (s: SimState, kind: string) => s.events.some((e) => e.type === 'mensaje' && e.data?.kind === kind)
 
 export const EXERCISES: Exercise[] = [
-  { id: 'ex1', number: 1, title: 'Familiarización con el buque y los mímicos', block: '1 · Familiarización', available: false, evaluated: true, summary: 'Ubicar tanques, líneas, válvulas y bombas; leer el calculador de carga.' },
-  { id: 'ex2', number: 2, title: 'Arranque de la planta de gas inerte e inertización', block: '2 · Operaciones especiales', available: false, evaluated: true, summary: 'Secuencia de arranque, O2 de suministro ≤ 5% y tanques < 8%.' },
+  { id: 'ex1', number: 1, title: 'Familiarización con el buque y los mímicos', block: 1, available: false, evaluated: true, summary: 'Ubicar tanques, líneas, válvulas y bombas; leer el calculador de carga.' },
+  { id: 'ex2', number: 2, title: 'Arranque de la planta de gas inerte e inertización', block: 2, available: false, evaluated: true, summary: 'Secuencia de arranque, O2 de suministro ≤ 5% y tanques < 8%.' },
   {
     id: 'ex3',
     number: 3,
     title: 'Cargar un tanque (CT1)',
-    block: '4 · Carga',
+    block: 4,
     available: true,
     evaluated: true,
     summary: 'Alineación, comunicación con la terminal, inicio a caudal reducido y topeo al 98%.',
@@ -96,22 +97,22 @@ export const EXERCISES: Exercise[] = [
     evaluate: evaluateEx3,
     canFinish: () => true,
   },
-  { id: 'ex4', number: 4, title: 'Deslastrar un tanque de carga vía ODM', block: '3 · Lastre', available: false, evaluated: true, summary: 'Arranque de bomba, límite de 15 ppm, desvío a slop y agotamiento.' },
-  { id: 'ex5', number: 5, title: 'Cálculo de carga', block: '4 · Carga', available: false, evaluated: true, summary: 'Volumen a 15 °C con VCF, peso en vacío y en aire, API y barriles.' },
-  { id: 'ex6', number: 6, title: 'Plan de carga', block: '4 · Carga', available: false, evaluated: true, summary: 'Secuencia de tanques, deslastrado coordinado, último tanque, calados finales.' },
-  { id: 'ex7', number: 7, title: 'Carga completa del buque', block: '4 · Carga', available: false, evaluated: true, summary: 'Ejecutar el plan sin rebalses y con esfuerzos dentro de límites.' },
-  { id: 'ex8', number: 8, title: 'Estabilidad y esfuerzos', block: '4 · Carga', available: false, evaluated: true, summary: 'Interpretar GZ, GM, cortantes, flectores, arrufo y quebranto.' },
-  { id: 'ex9', number: 9, title: 'Descarga con asiento de drenado y agotamiento', block: '4 · Carga', available: false, evaluated: true, summary: 'Asiento de 5–6 m, gas inerte positivo, sin cavitación sostenida.' },
-  { id: 'ex10', number: 10, title: 'Lavado con crudo (COW)', block: '2 · Operaciones especiales', available: false, evaluated: true, summary: 'O2 < 8%, línea de lavado ≥ 8 bar, solo tanques designados.' },
-  { id: 'ex11', number: 11, title: 'Lastrado: segregado, sucio y limpio', block: '3 · Lastre', available: false, evaluated: true, summary: 'Separación de dos válvulas, esfuerzos y asiento para la travesía.' },
-  { id: 'ex12', number: 12, title: 'Lavado con agua y manejo de lavazas', block: '2 · Operaciones especiales', available: false, evaluated: true, summary: 'Caja de mar, calentador y máquinas; lavazas a slop.' },
-  { id: 'ex13', number: 13, title: 'Decantación de slops y carga sobre residuos (LOT)', block: '2 · Operaciones especiales', available: false, evaluated: true, summary: 'Sedimentación, interfaz agua/aceite y descarga sin superar 15 ppm.' },
-  { id: 'ex14', number: 14, title: 'Purga y desgasificación para entrar a un tanque', block: '2 · Operaciones especiales', available: false, evaluated: true, summary: 'Purga a ≤ 2% de hidrocarburos; 21% de O2 y < 1% del LEL.' },
+  { id: 'ex4', number: 4, title: 'Deslastrar un tanque de carga vía ODM', block: 3, available: false, evaluated: true, summary: 'Arranque de bomba, límite de 15 ppm, desvío a slop y agotamiento.' },
+  { id: 'ex5', number: 5, title: 'Cálculo de carga', block: 4, available: false, evaluated: true, summary: 'Volumen a 15 °C con VCF, peso en vacío y en aire, API y barriles.' },
+  { id: 'ex6', number: 6, title: 'Plan de carga', block: 4, available: false, evaluated: true, summary: 'Secuencia de tanques, deslastrado coordinado, último tanque, calados finales.' },
+  { id: 'ex7', number: 7, title: 'Carga completa del buque', block: 4, available: false, evaluated: true, summary: 'Ejecutar el plan sin rebalses y con esfuerzos dentro de límites.' },
+  { id: 'ex8', number: 8, title: 'Estabilidad y esfuerzos', block: 4, available: false, evaluated: true, summary: 'Interpretar GZ, GM, cortantes, flectores, arrufo y quebranto.' },
+  { id: 'ex9', number: 9, title: 'Descarga con asiento de drenado y agotamiento', block: 4, available: false, evaluated: true, summary: 'Asiento de 5–6 m, gas inerte positivo, sin cavitación sostenida.' },
+  { id: 'ex10', number: 10, title: 'Lavado con crudo (COW)', block: 2, available: false, evaluated: true, summary: 'O2 < 8%, línea de lavado ≥ 8 bar, solo tanques designados.' },
+  { id: 'ex11', number: 11, title: 'Lastrado: segregado, sucio y limpio', block: 3, available: false, evaluated: true, summary: 'Separación de dos válvulas, esfuerzos y asiento para la travesía.' },
+  { id: 'ex12', number: 12, title: 'Lavado con agua y manejo de lavazas', block: 2, available: false, evaluated: true, summary: 'Caja de mar, calentador y máquinas; lavazas a slop.' },
+  { id: 'ex13', number: 13, title: 'Decantación de slops y carga sobre residuos (LOT)', block: 2, available: false, evaluated: true, summary: 'Sedimentación, interfaz agua/aceite y descarga sin superar 15 ppm.' },
+  { id: 'ex14', number: 14, title: 'Purga y desgasificación para entrar a un tanque', block: 2, available: false, evaluated: true, summary: 'Purga a ≤ 2% de hidrocarburos; 21% de O2 y < 1% del LEL.' },
   {
     id: 'libre',
     number: null,
     title: 'Práctica libre de carga',
-    block: 'Práctica',
+    block: 0,
     available: true,
     evaluated: false,
     summary: 'Las 4 líneas disponibles, sin plan ni nota. Para probar caudales, repartos y topeos.',
