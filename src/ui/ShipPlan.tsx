@@ -19,6 +19,14 @@ export const HULL_BOTTOM = HULL_TOP + 47 * SY
 
 export const lineColor = (id: number) => `var(--l${id})`
 
+/** Rectángulo de un tanque en coordenadas del plano (para anclar el popup). */
+export function tankBox(id: string) {
+  const t = ship.tanks.find((k) => k.id === id)!
+  const len = tankLength(ship, t)
+  const isFP = t.id === 'FP'
+  return { x: px(t.lcg - len / 2), w: len * SX, y: isFP ? rowY.C : rowY[t.side], h: isFP ? rowH.C : rowH[t.side] }
+}
+
 interface Props {
   fills: number[]
   flows?: number[]

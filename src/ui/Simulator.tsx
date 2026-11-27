@@ -1,8 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { advance, type Exercise } from '../sim/exercises'
-import { valveLabel, type SimState } from '../sim/engine'
+import type { SimState } from '../sim/engine'
 import type { TimedAction } from '../sim/worker'
-import { VLCC } from '../sim/ship'
 import { useSim } from './useSim'
 import { LinesView } from './LinesView'
 import { TerminalView } from './TerminalView'
@@ -24,46 +23,6 @@ interface Props {
   hints: boolean
   onFinish: (s: SimState, actions: TimedAction[]) => void
   onExit: () => void
-}
-
-function ValvePanel({ id, s, act }: { id: string; s: SimState; act: (o: number) => void }) {
-  const v = s.valves[id]
-  const [pct, setPct] = useState(Math.round(v * 100))
-  useEffect(() => setPct(Math.round(v * 100)), [v, id])
-  const throttle = id.startsWith('BV_')
-  return (
-    <section className="valve-panel" key={id} aria-live="polite">
-      <h3>{valveLabel(VLCC, id)}</h3>
-      <p className="valve-state">{v === 0 ? 'Cerrada' : v === 1 ? 'Abierta' : `Abierta al ${Math.round(v * 100)}%`}</p>
-      <div className="row">
-        <GButton id="panel:open" onClick={() => act(1)} disabled={v === 1}>
-          Abrir
-        </GButton>
-        <GButton id="panel:close" onClick={() => act(0)} disabled={v === 0}>
-          Cerrar
-        </GButton>
-      </div>
-      {throttle && (
-        <div style={{ marginTop: '0.6rem' }}>
-          <label className="quiet small-text" htmlFor="throttle">
-            Apertura para estrangular: {pct}%
-          </label>
-          <input id="throttle" type="range" min={0} max={100} step={5} value={pct} onChange={(e) => setPct(Number(e.target.value))} />
-          <div className="row">
-            {[25, 50, 75].map((p) => (
-              <GButton key={p} id={`panel:${p}`} className="small" onClick={() => act(p / 100)}>
-                {p}%
-              </GButton>
-            ))}
-            <span className="spacer" />
-            <button className="small primary" onClick={() => act(pct / 100)}>
-              Aplicar {pct}%
-            </button>
-          </div>
-        </div>
-      )}
-    </section>
-  )
 }
 
 export function Simulator({ exercise, hints, onFinish, onExit }: Props) {
@@ -142,7 +101,10 @@ export function Simulator({ exercise, hints, onFinish, onExit }: Props) {
         <div className="main">
           <div className="tabs" role="tablist">
             {VIEWS.map((v) => (
-              <button key={v.id} role="tab" aria-selected={view === v.id} className={guide.has(`tab:${v.id}`) ? 'guide' : undefined} onClick={() => setView(v.id)}>
+              <button key={v.id} role="tab" aria-selected={view === v.id} className={guide.has(`tab:${v.id}`) ? 'guide' : undefined} onClick={() => {
+                setSelected(null)
+                setView(v.id)
+              }}>
                 {v.label}
               </button>
             ))}
@@ -160,8 +122,8 @@ export function Simulator({ exercise, hints, onFinish, onExit }: Props) {
           <div className="view" key={view}>
             {view === 'lineas' && (
               <>
-                <LinesView s={s} selected={selected} onSelect={setSelected} />
-                <p className="hint">Tocá una válvula o un tanque para operarlo desde el panel de la derecha. Válvula llena: abierta. Gris: estrangulada. Hueca: cerrada.</p>
+                <LinesView s={s} selected={selected} onSelect={setSelected} act={(id, o) => act({ type: 'valve', id, opening: o })} />
+                <p className="hint">Tocá una válvula o un tanque y elegí qué hacer en el cuadro que aparece encima. Válvula llena: abierta. Gris: estrangulada. Hueca: cerrada.</p>
               </>
             )}
             {view === 'terminal' && <TerminalView s={s} act={act} />}
@@ -193,14 +155,6 @@ export function Simulator({ exercise, hints, onFinish, onExit }: Props) {
         </div>
 
         <aside className="side">
-          {selected ? (
-            <ValvePanel id={selected} s={s} act={(o) => act({ type: 'valve', id: selected, opening: o })} />
-          ) : (
-            <section>
-              <h3>Válvulas</h3>
-              <p className="quiet small-text">Tocá una válvula o un tanque en Líneas de carga para abrirla, cerrarla o estrangularla desde acá.</p>
-            </section>
-          )}
           {hints && steps.length > 0 && (
             <section>
               <h3>Pasos</h3>

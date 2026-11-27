@@ -8,7 +8,7 @@ import { fillOf } from './engine'
 import { evaluateEx3, type Evaluation } from './evaluation'
 
 export interface GuideUI {
-  /** válvula seleccionada en el panel */
+  /** válvula con el popup abierto */
   selected: string | null
   /** factor de tiempo actual */
   factor: number
@@ -28,7 +28,7 @@ export interface TutorialStep {
   guide?: (s: SimState, ui: GuideUI) => Guide
 }
 
-/** Qué tocar para dejar una válvula como se pide: primero la válvula, después el botón del panel. */
+/** Qué tocar para dejar una válvula como se pide: primero la válvula, después el botón del popup. */
 function valveTask(s: SimState, ui: GuideUI, id: string, want: 'abrir' | 'cerrar' | number): string[] | null {
   const v = s.valves[id]
   const ok = want === 'abrir' ? v === 1 : want === 'cerrar' ? v === 0 : v > 0 && v <= want + 1e-9

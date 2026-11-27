@@ -126,9 +126,11 @@ describe('guía de pasos del ejercicio 3', () => {
       clicks++
       if (t.startsWith('hose:')) applyAction(VLCC, s, { type: 'hose', line: Number(t.slice(5)), connected: true })
       else if (t.startsWith('valve:')) selected = t.slice(6)
-      else if (t === 'panel:open') applyAction(VLCC, s, { type: 'valve', id: selected!, opening: 1 })
-      else if (t === 'panel:close') applyAction(VLCC, s, { type: 'valve', id: selected!, opening: 0 })
-      else if (t.startsWith('panel:')) applyAction(VLCC, s, { type: 'valve', id: selected!, opening: Number(t.slice(6)) / 100 })
+      else if (t.startsWith('panel:')) {
+        const o = t === 'panel:open' ? 1 : t === 'panel:close' ? 0 : Number(t.slice(6)) / 100
+        applyAction(VLCC, s, { type: 'valve', id: selected!, opening: o })
+        selected = null // el popup se cierra al elegir
+      }
       else if (t.startsWith('msg:')) {
         const kind = t.slice(4) as 'listo' | 'iniciar' | 'caudal' | 'ultimo' | 'parar'
         applyAction(VLCC, s, { type: 'msg', kind, rate: kind === 'iniciar' ? 5000 : kind === 'caudal' ? 2000 : undefined })

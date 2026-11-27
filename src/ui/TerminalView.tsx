@@ -22,9 +22,12 @@ export function TerminalView({ s, act }: { s: SimState; act: (a: Action) => void
   const chatRef = useRef<HTMLDivElement>(null)
   const msgs = s.log.filter((l) => l.com || l.text.startsWith('ALARMA: Parada'))
 
+  // la terminal tiene una respuesta en camino: mostrar que está escribiendo
+  const typing = term.pending.length > 0
+
   useEffect(() => {
-    chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight })
-  }, [msgs.length])
+    chatRef.current?.scrollTo({ top: chatRef.current.scrollHeight, behavior: 'smooth' })
+  }, [msgs.length, typing])
 
   // color solo cuando la presión se acerca a la alarma
   const pColor = s.manifoldPressure >= P_HIGH ? 'var(--alarm-crit)' : s.manifoldPressure >= P_HIGH * 0.75 ? 'var(--alarm-high)' : 'var(--ink)'
@@ -106,6 +109,17 @@ export function TerminalView({ s, act }: { s: SimState; act: (a: Action) => void
               <span>{m.text}</span>
             </div>
           ))}
+          {typing && (
+            <div className="terminal typing" role="status">
+              <span className="when" />
+              <span className="who">Terminal</span>
+              <span className="dots" aria-label="La terminal está respondiendo">
+                <i />
+                <i />
+                <i />
+              </span>
+            </div>
+          )}
         </div>
       </div>
     </div>

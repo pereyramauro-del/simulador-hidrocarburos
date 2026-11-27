@@ -5,7 +5,7 @@ import { createContext, useContext, type ButtonHTMLAttributes } from 'react'
   y la interfaz los resalta. Cada control resaltable se identifica con un id:
     tab:<vista>         pestaña (lineas, terminal, tanques, registro)
     valve:<id>          válvula del mímico (MF1, DROP1, BV_CT1…)
-    panel:open|close|25|50|75   botones del panel de la válvula seleccionada
+    panel:open|close|25|50|75   botones del popup de la válvula seleccionada
     hose:<línea>        conectar manguera
     msg:<tipo>          botones de comunicación (listo, iniciar, caudal, ultimo, parar)
     rate                campo de caudal
@@ -16,9 +16,9 @@ export const GuideContext = createContext<Set<string>>(new Set())
 
 export const useGuide = (id: string) => useContext(GuideContext).has(id)
 
-/** Vista donde vive cada control; los del panel lateral y la barra superior están siempre visibles */
+/** Vista donde vive cada control; el popup de válvula vive en Líneas; la barra superior está siempre visible */
 export function viewOf(target: string): string | null {
-  if (target.startsWith('valve:')) return 'lineas'
+  if (target.startsWith('valve:') || target.startsWith('panel:')) return 'lineas'
   if (target.startsWith('hose:') || target.startsWith('msg:') || target === 'rate') return 'terminal'
   if (target.startsWith('view:')) return target.slice(5)
   return null
